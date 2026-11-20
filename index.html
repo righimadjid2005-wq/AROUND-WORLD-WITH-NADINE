@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Around the World with Nadine</title>
+    <meta
+      name="description"
+      content="A cozy cooperative 2D puzzle-platformer following Madjid and Nadine as they travel across sunlit valleys, sunset arches, and starry passes together before their wedding."
+    />
+    <meta property="og:title" content="Around the World with Nadine" />
+    <meta
+      property="og:description"
+      content="A cozy cooperative 2D puzzle-platformer following Madjid and Nadine as they travel across sunlit valleys, sunset arches, and starry passes together before their wedding."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body data-state="title">
+    <main class="game-shell" id="game-shell">
+      <!-- Isolated 60fps Canvas Viewport -->
+      <div class="canvas-stage" id="canvas-stage">
+        <canvas
+          id="game-canvas"
+          data-testid="game-canvas"
+          aria-label="Around the World with Nadine game canvas"
+        ></canvas>
+      </div>
+
+      <!-- TITLE SCREEN OVERLAY -->
+      <section
+        id="title-screen"
+        class="overlay-layer title-overlay"
+        aria-label="Title screen"
+      >
+        <div class="title-content">
+          <!-- Custom Bespoke Inline SVG Title Lockup -->
+          <div class="title-emblem-wrap">
+            <svg
+              class="title-svg-lockup"
+              viewBox="0 0 640 168"
+              role="img"
+              aria-label="Around the World with Nadine"
+            >
+              <!-- Delicate Storybook Compass & Ribbon Crest -->
+              <g transform="translate(320 26)">
+                <line x1="-130" y1="0" x2="-34" y2="0" stroke="#FDE4B2" stroke-width="1.5" stroke-linecap="round" opacity="0.78" />
+                <line x1="34" y1="0" x2="130" y2="0" stroke="#FDE4B2" stroke-width="1.5" stroke-linecap="round" opacity="0.78" />
+                <circle cx="-138" cy="0" r="2.5" fill="#FDE4B2" opacity="0.9" />
+                <circle cx="138" cy="0" r="2.5" fill="#FDE4B2" opacity="0.9" />
+                <!-- Compass Star -->
+                <path
+                  d="M0 -15 L3.8 -3.8 L15 0 L3.8 3.8 L0 15 L-3.8 3.8 L-15 0 L-3.8 -3.8 Z"
+                  fill="#FFF2C6"
+                  stroke="#2B2142"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+                <circle cx="0" cy="0" r="3" fill="#F07F9A" />
+                <!-- Tiny Twin Companion Dots -->
+                <circle cx="-23" cy="0" r="3.4" fill="#52A5E8" stroke="#2B2142" stroke-width="1.3" />
+                <circle cx="23" cy="0" r="3.4" fill="#F07F9A" stroke="#2B2142" stroke-width="1.3" />
+              </g>
+
+              <!-- Upper Scripted Subtitle Line (with crisp offset drop shadow) -->
+              <text
+                x="320"
+                y="79"
+                text-anchor="middle"
+                class="svg-title-upper-shadow"
+                aria-hidden="true"
+              >
+                Around the World
+              </text>
+              <text
+                x="320"
+                y="76"
+                text-anchor="middle"
+                class="svg-title-upper"
+              >
+                Around the World
+              </text>
+
+              <!-- Main Focal Title Line (with crisp offset drop shadow) -->
+              <text
+                x="320"
+                y="136"
+                text-anchor="middle"
+                class="svg-title-main-shadow"
+                aria-hidden="true"
+              >
+                with Nadine
+              </text>
+              <text
+                x="320"
+                y="132"
+                text-anchor="middle"
+                class="svg-title-main"
+              >
+                with Nadine
+              </text>
+
+              <!-- Delicate Flourish Underline -->
+              <path
+                d="M175 152 Q320 164 465 152"
+                fill="none"
+                stroke="#FFE7B8"
+                stroke-width="2"
+                stroke-linecap="round"
+                opacity="0.82"
+              />
+            </svg>
+          </div>
+
+          <!-- Story Premise Plaque -->
+          <p class="story-premise" id="story-premise"></p>
+
+          <!-- Primary & Secondary Menu Actions (<= 3 actions) -->
+          <div class="title-actions">
+            <button
+              type="button"
+              id="btn-start-journey"
+              class="btn-primary"
+              data-start="true"
+            >
+              Begin Journey
+            </button>
+            <div class="title-secondary-row">
+              <button
+                type="button"
+                id="btn-title-coop"
+                class="btn-secondary"
+              >
+                Online Co-op
+              </button>
+              <button
+                type="button"
+                id="btn-title-chapters"
+                class="btn-secondary"
+              >
+                Worlds (50)
+              </button>
+              <button
+                type="button"
+                id="btn-title-skins"
+                class="btn-secondary"
+              >
+                Skins
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Single Flat Bottom Control Hint Line -->
+        <p class="title-control-hint">
+          WASD / Arrows Move &middot; Space Jump &middot; Tab Switch Character &middot; R Restart &middot; Esc Pause
+        </p>
+      </section>
+
+      <!-- ACTIVE GAMEPLAY HUD (Pointer Pass-Through, >= 85% Clear Playfield) -->
+      <div id="hud-layer" class="hud-layer hidden" aria-label="Game heads-up display">
+        <!-- Top Perimeter Bar -->
+        <div class="hud-top-row">
+          <!-- Top-Left World-Matched Status Cluster -->
+          <div class="hud-cluster hud-chapter-cluster">
+            <div class="hud-chapter-heading">
+              <span class="hud-kicker" id="hud-chapter-num">W1-1</span>
+              <span class="hud-sep" aria-hidden="true">&middot;</span>
+              <span class="hud-chapter-title" id="hud-chapter-title">Dawn Over the Quiet Village</span>
+            </div>
+            <div class="hud-metrics-line">
+              <!-- Active Character Switcher Readout (Solo Only; Hidden & Disabled in Co-op Mode) -->
+              <button
+                type="button"
+                id="hud-switch-char"
+                class="hud-char-btn"
+                tabindex="-1"
+                aria-label="Switch active character between Madjid and Nadine"
+              >
+                <span class="char-swatch" id="hud-char-swatch" aria-hidden="true"></span>
+                <span id="hud-char-name">Madjid</span>
+                <span class="key-hint">Tab</span>
+              </button>
+
+              <!-- Locked Character Readout (Shown ONLY in Co-op Mode; Non-Switchable) -->
+              <div
+                id="hud-char-locked"
+                class="hud-char-locked hidden"
+                aria-label="Assigned co-op character"
+              >
+                <span class="char-swatch" id="hud-char-locked-swatch" aria-hidden="true"></span>
+                <span id="hud-char-locked-name">Madjid</span>
+              </div>
+
+              <!-- Active Co-op Room Code & Player Count -->
+              <span id="hud-coop-room-tag" class="hud-coop-room-tag hidden"></span>
+
+              <!-- Keys Readout with Custom Inline SVG Key Icon -->
+              <div class="hud-key-readout" aria-label="Keys collected">
+                <svg class="hud-svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="8" cy="12" r="5" fill="#FCD34D" stroke="#2B2142" stroke-width="2" />
+                  <circle cx="8" cy="12" r="1.8" fill="#2B2142" />
+                  <path d="M13 12 H21 V15.5 M17.5 12 V15" fill="none" stroke="#FCD34D" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M13 12 H21 V15.5 M17.5 12 V15" fill="none" stroke="#2B2142" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span class="tabular-nums" id="hud-key-count">0/1</span>
+              </div>
+
+              <!-- Subtle Checkpoint Lantern Indicator (Lights Warmly When Checkpoint Reached) -->
+              <div
+                id="hud-checkpoint-indicator"
+                class="hud-checkpoint-indicator"
+                title="Checkpoint lantern"
+                aria-label="No checkpoint lit yet"
+              >
+                <svg class="hud-svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  <rect x="7" y="6" width="10" height="12" rx="4" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="1.8" />
+                  <path d="M9 18h6M10 21h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+              </div>
+
+              <!-- Elapsed Time -->
+              <span class="hud-timer tabular-nums" id="hud-timer" aria-label="Stage time">00:00</span>
+            </div>
+          </div>
+
+          <!-- Top-Right Compact Utility Controls -->
+          <div class="hud-cluster hud-utility-cluster">
+            <button
+              type="button"
+              id="hud-btn-coop"
+              class="hud-icon-btn"
+              tabindex="-1"
+              title="Online 2-Player Co-op"
+              aria-label="Open online co-op lobby"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="9" cy="8.5" r="3" fill="none" stroke="currentColor" stroke-width="2" />
+                <circle cx="16.5" cy="9.5" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+                <path
+                  d="M3.5 18.5c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M14.5 18.5c.4-2 1.8-3.3 3.6-3.3 1.4 0 2.5.8 3.2 2.2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span class="hud-btn-label">Co-op</span>
+            </button>
+
+            <button
+              type="button"
+              id="hud-btn-skins"
+              class="hud-icon-btn"
+              tabindex="-1"
+              title="Customize Skins"
+              aria-label="Open skin selector"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 3a9 9 0 0 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a1.5 1.5 0 0 1 0-3h4a5 5 0 0 0 5-5c0-2.8-3.8-5-9-5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                />
+                <circle cx="8.5" cy="10.5" r="1.2" fill="currentColor" />
+                <circle cx="12" cy="8" r="1.2" fill="currentColor" />
+                <circle cx="15.5" cy="10" r="1.2" fill="currentColor" />
+              </svg>
+              <span class="hud-btn-label">Skins</span>
+            </button>
+
+            <button
+              type="button"
+              id="hud-btn-chat"
+              class="hud-icon-btn"
+              tabindex="-1"
+              title="Toggle Chat Box (T)"
+              aria-label="Toggle chat box"
+              aria-expanded="false"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7A2.5 2.5 0 0 1 16.5 16H10l-4.2 3.2A.5.5 0 0 1 5 18.8V6.5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <span class="hud-btn-label">Chat</span>
+            </button>
+
+            <button
+              type="button"
+              id="hud-btn-restart"
+              class="hud-icon-btn"
+              tabindex="-1"
+              title="Restart Chapter (R)"
+              aria-label="Restart chapter"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 12a8 8 0 1 0 2.3-5.6L4 8.7M4 4.5v4.2h4.2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              id="hud-btn-mute"
+              class="hud-icon-btn"
+              tabindex="-1"
+              title="Mute or Unmute SFX (M)"
+              aria-label="Mute sound effects"
+              aria-pressed="false"
+            >
+              <svg id="icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M5 9.5h3.5L13 5.5v13l-4.5-4H5v-5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M16.5 8.8a4.8 4.8 0 0 1 0 6.4M19 6.2a8.4 8.4 0 0 1 0 11.6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <svg id="icon-sound-off" class="hidden" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M5 9.5h3.5L13 5.5v13l-4.5-4H5v-5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M16.5 9.5l5 5M21.5 9.5l-5 5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              id="hud-btn-pause"
+              class="hud-icon-btn"
+              tabindex="-1"
+              title="Pause (Esc)"
+              aria-label="Pause game"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
+                <rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chapter Story Caption Ribbon (dismissible / quiet lower-center) -->
+        <div id="story-caption-bar" class="story-caption-bar" role="status" aria-live="polite">
+          <p id="story-caption-text" class="story-caption-text"></p>
+          <button
+            type="button"
+            id="btn-dismiss-caption"
+            class="caption-close-btn"
+            tabindex="-1"
+            aria-label="Dismiss story caption"
+          >
+            &times;
+          </button>
+        </div>
+
+        <!-- 2D Open-World Mode Build & Craft Toolbar (Visible ONLY in Open-World Mode) -->
+        <div id="openworld-bar" class="openworld-bar hidden" aria-label="2D Open-World building and crafting tools">
+          <div id="openworld-craft-menu" class="openworld-craft-menu hidden" role="region" aria-label="Crafting recipes"></div>
+          <div class="openworld-bar-inner">
+            <div id="openworld-palette" class="openworld-palette" role="toolbar" aria-label="Block palette"></div>
+            <div class="openworld-actions">
+              <button type="button" id="btn-openworld-craft" class="ow-action-btn" tabindex="-1">
+                Craft
+              </button>
+              <button type="button" id="btn-openworld-sky" class="ow-action-btn" tabindex="-1">
+                Sky: Dawn
+              </button>
+              <button type="button" id="btn-openworld-story" class="ow-action-btn ow-story-btn" tabindex="-1">
+                Story
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compact Toggleable Text Chat Box UI (Network-Ready Local Adapter) -->
+        <aside
+          id="chat-box"
+          class="chat-box hidden"
+          aria-label="Traveler chat box"
+        >
+          <div class="chat-header">
+            <div class="chat-header-title">
+              <span>Journey Notes &amp; Chat</span>
+              <span class="chat-speaker-label" id="chat-speaker-label">Speaking as Madjid</span>
+            </div>
+            <button
+              type="button"
+              id="btn-close-chat"
+              class="chat-close-btn"
+              aria-label="Close chat box"
+            >
+              &times;
+            </button>
+          </div>
+          <div id="chat-messages" class="chat-messages" role="log" aria-live="polite"></div>
+          <form id="chat-form" class="chat-form" autocomplete="off">
+            <label for="chat-input" class="sr-only">Write a chat message</label>
+            <input
+              id="chat-input"
+              type="text"
+              maxlength="160"
+              placeholder="Write to your travel partner..."
+              class="chat-input"
+            />
+            <button type="submit" id="chat-send-btn" class="chat-send-btn">Send</button>
+          </form>
+        </aside>
+
+        <!-- Responsive Multi-Touch On-Screen Controls (Mobile & Touch / Optional Desktop Toggle) -->
+        <div id="touch-controls" class="touch-controls" aria-label="On-screen touch controls">
+          <div class="touch-group touch-left-group">
+            <button
+              type="button"
+              id="touch-left"
+              class="touch-btn touch-move-btn"
+              data-action="left"
+              aria-label="Move left"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              id="touch-right"
+              class="touch-btn touch-move-btn"
+              data-action="right"
+              aria-label="Move right"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="touch-group touch-right-group">
+            <button
+              type="button"
+              id="touch-switch"
+              class="touch-btn touch-switch-btn"
+              data-action="switch"
+              aria-label="Switch character"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M7 7h10l-3-3M17 17H7l3 3"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <span>Switch</span>
+            </button>
+            <button
+              type="button"
+              id="touch-jump"
+              class="touch-btn touch-jump-btn"
+              data-action="jump"
+              aria-label="Jump"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 15l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Jump</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAUSE MODAL -->
+      <section
+        id="pause-modal"
+        class="overlay-layer modal-backdrop hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pause-title"
+      >
+        <div class="modal-card">
+          <h2 id="pause-title" class="modal-title">Journey Paused</h2>
+          <p class="modal-subtitle" id="pause-chapter-info">Chapter 1 &middot; Dawn Over the Quiet Village</p>
+          <div class="modal-actions-stack">
+            <button type="button" id="btn-pause-resume" class="btn-primary">Resume</button>
+            <button type="button" id="btn-pause-coop" class="btn-secondary">Online 2-Player Co-op</button>
+            <button type="button" id="btn-pause-openworld" class="btn-secondary">2D Open-World Mode</button>
+            <button type="button" id="btn-pause-restart" class="btn-secondary">Restart Chapter</button>
+            <button type="button" id="btn-pause-skins" class="btn-secondary">Skins</button>
+            <button type="button" id="btn-pause-chapters" class="btn-secondary">Worlds &amp; Levels</button>
+            <button type="button" id="btn-pause-touch-toggle" class="btn-secondary">
+              On-Screen Pad: Auto
+            </button>
+            <button type="button" id="btn-pause-title" class="btn-ghost">Return to Title</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SKIN SELECTOR MODAL -->
+      <section
+        id="skins-modal"
+        class="overlay-layer modal-backdrop hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="skins-title"
+      >
+        <div class="modal-card modal-card-wide">
+          <div class="modal-header-row">
+            <div>
+              <h2 id="skins-title" class="modal-title">Traveler Skins</h2>
+              <p class="modal-subtitle">Choose outfits for Madjid and Nadine</p>
+            </div>
+            <button
+              type="button"
+              id="btn-close-skins"
+              class="modal-close-icon"
+              aria-label="Close skin selector"
+            >
+              &times;
+            </button>
+          </div>
+
+          <div class="skin-tabs" role="tablist" aria-label="Select character">
+            <button
+              type="button"
+              role="tab"
+              id="tab-skin-madjid"
+              class="skin-tab active"
+              aria-selected="true"
+              data-char="madjid"
+            >
+              Madjid
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-skin-nadine"
+              class="skin-tab"
+              aria-selected="false"
+              data-char="nadine"
+            >
+              Nadine
+            </button>
+          </div>
+
+          <div id="skin-grid" class="skin-grid" role="tabpanel"></div>
+
+          <div class="modal-footer-row">
+            <button type="button" id="btn-skins-done" class="btn-primary">Done</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- WORLD ATLAS / 50-LEVEL SELECTOR MODAL -->
+      <section
+        id="chapters-modal"
+        class="overlay-layer modal-backdrop hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="chapters-title"
+      >
+        <div class="modal-card modal-card-wide">
+          <div class="modal-header-row">
+            <div>
+              <h2 id="chapters-title" class="modal-title">World Atlas</h2>
+              <p class="modal-subtitle" id="chapters-progress-label">
+                10 Worlds &middot; 50 Stages &middot; 0/50 Cleared
+              </p>
+            </div>
+            <button
+              type="button"
+              id="btn-close-chapters"
+              class="modal-close-icon"
+              aria-label="Close world atlas"
+            >
+              &times;
+            </button>
+          </div>
+
+          <div id="world-tabs" class="world-tabs-row" role="tablist" aria-label="Select world"></div>
+
+          <div class="world-banner" id="world-banner">
+            <span class="world-banner-kicker" id="world-banner-kicker">World 1 of 10</span>
+            <h3 class="world-banner-name" id="world-banner-name">Quiet Village Outskirts</h3>
+            <p class="world-banner-meta" id="world-banner-meta">Where a promise begins at dawn</p>
+          </div>
+
+          <div id="chapters-list" class="chapters-list" role="tabpanel"></div>
+        </div>
+      </section>
+
+      <!-- CHAPTER CLEAR MODAL -->
+      <section
+        id="chapter-clear-modal"
+        class="overlay-layer modal-backdrop hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="chapter-clear-title"
+      >
+        <div class="modal-card">
+          <p class="modal-kicker" id="clear-kicker">Chapter 1 Complete</p>
+          <h2 id="chapter-clear-title" class="modal-title">Together Across the Horizon</h2>
+          <p class="modal-story-quote" id="clear-story-note"></p>
+          <div class="modal-stats-row">
+            <div class="stat-item">
+              <span class="stat-label">Clear Time</span>
+              <span class="stat-value tabular-nums" id="clear-time-val">00:00</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Keys Found</span>
+              <span class="stat-value tabular-nums" id="clear-keys-val">1/1</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Switches</span>
+              <span class="stat-value tabular-nums" id="clear-switches-val">2</span>
+            </div>
+          </div>
+          <div class="modal-actions-row">
+            <button type="button" id="btn-next-chapter" class="btn-primary" data-start="true">
+              Next Chapter
+            </button>
+            <button type="button" id="btn-replay-chapter" class="btn-secondary">
+              Replay
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- WEDDING HORIZON VICTORY MODAL (ALL 10 WORLDS / 50 STAGES COMPLETE) -->
+      <section
+        id="victory-modal"
+        class="overlay-layer modal-backdrop hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="victory-title"
+      >
+        <div class="modal-card modal-card-celebration">
+          <p class="modal-kicker">All 10 Worlds Complete</p>
+          <h2 id="victory-title" class="modal-title">Ready for Their Wedding Day</h2>
+          <p class="modal-story-quote">
+            Across quiet villages, sunlit meadows, lantern harbors, starry deserts, moonlit gardens,
+            and the golden summit, Madjid and Nadine solved every puzzle side by side. Now a brand-new life begins together.
+          </p>
+          <div class="modal-stats-row">
+            <div class="stat-item">
+              <span class="stat-label">Worlds Cleared</span>
+              <span class="stat-value tabular-nums" id="victory-chapters-val">10/10</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Total Time</span>
+              <span class="stat-value tabular-nums" id="victory-time-val">00:00</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Stages Reached</span>
+              <span class="stat-value tabular-nums" id="victory-keys-val">50/50</span>
+            </div>
+          </div>
+          <div class="modal-actions-row">
+            <button type="button" id="btn-play-again" class="btn-primary" data-start="true">
+              Play Again
+            </button>
+            <button type="button" id="btn-victory-title" class="btn-secondary">
+              Title Screen
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ONLINE 2-PLAYER CO-OP LOBBY MODAL (Cloud ws:// / wss://) -->
+      <section
+        id="coop-modal"
+        class="overlay-layer modal-backdrop hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="coop-title"
+      >
+        <div class="modal-card modal-card-wide coop-modal-card">
+          <div class="modal-header-row">
+            <div>
+              <h2 id="coop-title" class="modal-title">Online 2-Player Co-op</h2>
+              <p class="modal-subtitle">
+                Play Story Levels or 2D Open-World Mode together (max 2 players: Madjid &amp; Nadine)
+              </p>
+            </div>
+            <button
+              type="button"
+              id="btn-close-coop"
+              class="modal-close-icon"
+              aria-label="Close online co-op lobby"
+            >
+              &times;
+            </button>
+          </div>
+
+          <!-- Configurable Cloud WebSocket Server URL (ws:// or wss://) -->
+          <div class="coop-server-bar">
+            <label for="coop-server-url" class="coop-field-label">Cloud Server (ws:// or wss://)</label>
+            <div class="coop-server-row">
+              <input
+                id="coop-server-url"
+                type="url"
+                class="coop-input"
+                placeholder="wss://your-server.example.com/ws"
+                spellcheck="false"
+              />
+              <button type="button" id="btn-coop-connect" class="btn-secondary coop-compact-btn">
+                Connect
+              </button>
+            </div>
+            <div class="coop-conn-meta">
+              <span id="coop-conn-status" class="coop-conn-status">Disconnected</span>
+              <span id="coop-feedback" class="coop-feedback hidden" role="alert"></span>
+            </div>
+          </div>
+
+          <!-- Active Co-op Session Panel (Visible When Joined to a Room) -->
+          <div id="coop-active-panel" class="coop-active-panel hidden">
+            <div class="coop-active-header">
+              <div>
+                <span class="coop-field-label">Active Room</span>
+                <h3 id="coop-active-name" class="coop-active-name">Madjid &amp; Nadine Room</h3>
+              </div>
+              <div class="coop-code-box">
+                <span id="coop-active-code" class="coop-code-value tabular-nums">ND-0000</span>
+                <button type="button" id="btn-coop-copy-code" class="coop-mini-btn">Copy</button>
+              </div>
+            </div>
+
+            <div id="coop-active-roster" class="coop-roster-row"></div>
+            <p class="coop-lock-note">
+              Co-op character lock active: each player controls their own character (Switch disabled).
+            </p>
+
+            <div class="coop-active-controls">
+              <button type="button" id="btn-coop-mode-story" class="btn-secondary coop-compact-btn">
+                Play Story Levels
+              </button>
+              <button type="button" id="btn-coop-mode-openworld" class="btn-secondary coop-compact-btn">
+                Play 2D Open-World
+              </button>
+              <button type="button" id="btn-coop-resume" class="btn-primary coop-compact-btn">
+                Return to Game
+              </button>
+              <button type="button" id="btn-coop-leave" class="btn-ghost coop-compact-btn">
+                Leave Room
+              </button>
+            </div>
+          </div>
+
+          <!-- Create & Browse/Search Lobby Panels (Visible When Not in a Room) -->
+          <div id="coop-lobby-panels" class="coop-lobby-grid">
+            <!-- Create Room -->
+            <form id="coop-create-form" class="coop-section-card" autocomplete="off">
+              <h3 class="coop-section-title">Create Room</h3>
+
+              <label for="coop-create-name" class="coop-field-label">Room Name</label>
+              <input
+                id="coop-create-name"
+                type="text"
+                maxlength="36"
+                class="coop-input"
+                placeholder="e.g., Sunset Journey with Nadine"
+              />
+
+              <div class="coop-choice-group">
+                <span class="coop-field-label">Game Mode</span>
+                <div class="coop-segmented" role="radiogroup" aria-label="Game mode">
+                  <button
+                    type="button"
+                    class="coop-seg-btn active"
+                    data-coop-mode="story"
+                    aria-pressed="true"
+                  >
+                    Story Levels
+                  </button>
+                  <button
+                    type="button"
+                    class="coop-seg-btn"
+                    data-coop-mode="openworld"
+                    aria-pressed="false"
+                  >
+                    2D Open-World
+                  </button>
+                </div>
+              </div>
+
+              <div class="coop-choice-group">
+                <span class="coop-field-label">Your Character</span>
+                <div class="coop-segmented" role="radiogroup" aria-label="Your character">
+                  <button
+                    type="button"
+                    class="coop-seg-btn active"
+                    data-coop-char="madjid"
+                    aria-pressed="true"
+                  >
+                    Madjid
+                  </button>
+                  <button
+                    type="button"
+                    class="coop-seg-btn"
+                    data-coop-char="nadine"
+                    aria-pressed="false"
+                  >
+                    Nadine
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" id="btn-coop-create" class="btn-primary coop-full-btn">
+                Create Room (2 Players Max)
+              </button>
+            </form>
+
+            <!-- Browse & Search Active Rooms -->
+            <div class="coop-section-card">
+              <div class="coop-browse-header">
+                <h3 class="coop-section-title">Browse &amp; Search Rooms</h3>
+                <button type="button" id="btn-coop-refresh" class="coop-mini-btn">Refresh</button>
+              </div>
+
+              <form id="coop-search-form" class="coop-search-row" autocomplete="off">
+                <label for="coop-search-input" class="sr-only">Search by room code or room name</label>
+                <input
+                  id="coop-search-input"
+                  type="text"
+                  maxlength="36"
+                  class="coop-input"
+                  placeholder="Code or room name"
+                />
+                <button type="submit" id="btn-coop-search" class="coop-mini-btn">Search</button>
+                <button type="button" id="btn-coop-join-code" class="coop-mini-btn coop-mini-gold">
+                  Join
+                </button>
+              </form>
+
+              <div id="coop-rooms-list" class="coop-rooms-list" role="list">
+                <p class="coop-empty-text">Connect to view active rooms.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/game.js"></script>
+  </body>
+</html>
