@@ -241,6 +241,46 @@ export function createCoopClient(callbacks = {}) {
           callbacks.onChatMessage?.(msg.message);
           break;
 
+        case 'player:emote':
+          callbacks.onPlayerEmote?.(msg);
+          break;
+
+        case 'world:trigger':
+          callbacks.onWorldTrigger?.(msg);
+          break;
+
+        case 'ghost:sync':
+          callbacks.onGhostSync?.(msg);
+          break;
+
+        case 'carry:sync':
+          callbacks.onCarrySync?.(msg);
+          break;
+
+        case 'dance:sync':
+          callbacks.onDanceSync?.(msg);
+          break;
+
+        case 'dance:invite':
+          callbacks.onDanceInvite?.(msg);
+          break;
+
+        case 'dance:respond':
+          callbacks.onDanceRespond?.(msg);
+          break;
+
+        case 'boss:sync':
+          callbacks.onBossSync?.(msg);
+          break;
+
+        case 'weather:sync':
+          callbacks.onWeatherSync?.(msg);
+          break;
+
+        case 'scrapbook:updated':
+          callbacks.onScrapbookUpdated?.(msg);
+          break;
+
         case 'error':
           callbacks.onError?.(msg.code || 'ERROR', msg.message || 'Server error.');
           break;
@@ -363,6 +403,66 @@ export function createCoopClient(callbacks = {}) {
     });
   }
 
+  function sendEmote({ emoteId, x = null, y = null }) {
+    if (!activeRoomCode || !emoteId) return;
+    sendPacket({
+      type: 'player:emote',
+      emoteId,
+      x,
+      y,
+    });
+  }
+
+  function sendWorldTrigger({ triggerKind, x = null, y = null }) {
+    if (!activeRoomCode || !triggerKind) return;
+    sendPacket({
+      type: 'world:trigger',
+      triggerKind,
+      x,
+      y,
+    });
+  }
+
+  function sendGhostSync(payload) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'ghost:sync', ...payload });
+  }
+
+  function sendCarrySync(payload) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'carry:sync', ...payload });
+  }
+
+  function sendDanceSync(payload) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'dance:sync', ...payload });
+  }
+
+  function sendDanceInvite(styleId, styleName) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'dance:invite', styleId, styleName });
+  }
+
+  function sendDanceRespond(accepted, styleId) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'dance:respond', accepted: Boolean(accepted), styleId });
+  }
+
+  function sendBossSync(payload) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'boss:sync', ...payload });
+  }
+
+  function sendWeatherSync(weather) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'weather:sync', weather });
+  }
+
+  function sendPhotoSnap(photo) {
+    if (!activeRoomCode || !photo) return;
+    sendPacket({ type: 'photo:snap', photo });
+  }
+
   return {
     connect,
     disconnect,
@@ -380,5 +480,15 @@ export function createCoopClient(callbacks = {}) {
     sendOpenWorldAction,
     sendSkinUpdate,
     sendChat,
+    sendEmote,
+    sendWorldTrigger,
+    sendGhostSync,
+    sendCarrySync,
+    sendDanceSync,
+    sendDanceInvite,
+    sendDanceRespond,
+    sendBossSync,
+    sendWeatherSync,
+    sendPhotoSnap,
   };
 }

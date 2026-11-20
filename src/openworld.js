@@ -317,18 +317,33 @@ export function buildOpenWorldSolidPlatforms(basePlatforms, owState) {
 /**
  * Renders all placed open-world blocks (solid timber/cobble/sky-bridges + decorative lanterns/blossoms/arches)
  * and a soft cursor hover outline when aiming to build.
+ * @param {any} ctx
+ * @param {any} owState
+ * @param {number} time
+ * @param {{ gx: number, gy: number } | null} [hoverCell=null]
+ * @param {string} [selectedType='wood']
+ * @param {{ minX: number, maxX: number } | null} [viewRange=null]
  */
-export function renderOpenWorldBlocks(ctx, owState, time, hoverCell = null, selectedType = 'wood') {
+export function renderOpenWorldBlocks(
+  ctx,
+  owState,
+  time,
+  hoverCell = null,
+  selectedType = 'wood',
+  viewRange = null
+) {
   const size = OPEN_WORLD_CONFIG.TILE_SIZE;
 
   owState.blocks.forEach((b) => {
     const x = b.gx * size;
     const y = b.gy * size;
+    if (viewRange && (x + size < viewRange.minX || x > viewRange.maxX)) return;
     const def = OPEN_WORLD_BLOCKS[b.type];
     if (!def) return;
 
     ctx.save();
-    if (b.type === 'wood' || b.type === 'stone') {
+    if (b.type === 'wood') {
+      // Rich bevelled timber crate with plank seams, grain highlights & brass corner pegs
       ctx.fillStyle = def.color;
       ctx.strokeStyle = def.trimColor;
       ctx.lineWidth = 2.2;
@@ -337,29 +352,86 @@ export function renderOpenWorldBlocks(ctx, owState, time, hoverCell = null, sele
       ctx.fill();
       ctx.stroke();
 
+      // Inner shadow & bottom bevel
+      ctx.fillStyle = 'rgba(22, 12, 8, 0.24)';
+      ctx.fillRect(x + 3, y + size - 7, size - 6, 4);
+
+      // Sunlit top cap
       ctx.fillStyle = def.topColor;
       ctx.beginPath();
       ctx.roundRect(x + 3, y + 3, size - 6, 8, 3);
       ctx.fill();
 
-      ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+      // Plank seams & woodgrain stroke
+      ctx.strokeStyle = 'rgba(42, 24, 14, 0.42)';
       ctx.lineWidth = 1.4;
-      if (b.type === 'wood') {
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y + 20);
+      ctx.lineTo(x + size - 4, y + 20);
+      ctx.moveTo(x + 4, y + 30);
+      ctx.lineTo(x + size - 4, y + 30);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(255, 242, 212, 0.24)';
+      ctx.beginPath();
+      ctx.moveTo(x + 7, y + 15);
+      ctx.lineTo(x + size - 10, y + 15);
+      ctx.moveTo(x + 9, y + 25);
+      ctx.lineTo(x + size - 7, y + 25);
+      ctx.stroke();
+
+      // Corner brass pegs
+      ctx.fillStyle = '#F5C469';
+      [
+        [x + 6, y + 14],
+        [x + size - 6, y + 14],
+        [x + 6, y + size - 6],
+        [x + size - 6, y + size - 6],
+      ].forEach(([px, py]) => {
         ctx.beginPath();
-        ctx.moveTo(x + 6, y + 19);
-        ctx.lineTo(x + size - 6, y + 19);
-        ctx.moveTo(x + 6, y + 29);
-        ctx.lineTo(x + size - 6, y + 29);
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(x + size * 0.5, y + 12);
-        ctx.lineTo(x + size * 0.5, y + size - 4);
-        ctx.moveTo(x + 6, y + 24);
-        ctx.lineTo(x + size - 6, y + 24);
-        ctx.stroke();
-      }
+        ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    } else if (b.type === 'stone') {
+      // Sculpted cobblestone ashlar block with inner shading & bright chisel rim
+      ctx.fillStyle = def.color;
+      ctx.strokeStyle = def.trimColor;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.roundRect(x + 1, y + 1, size - 2, size - 2, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(12, 10, 24, 0.26)';
+      ctx.fillRect(x + 3, y + 23, size - 6, 13);
+
+      ctx.fillStyle = def.topColor;
+      ctx.beginPath();
+      ctx.roundRect(x + 3, y + 3, size - 6, 8, 3);
+      ctx.fill();
+
+      // Ashlar mortar grooves & bevel highlights
+      ctx.strokeStyle = 'rgba(20, 18, 34, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x + size * 0.5, y + 11);
+      ctx.lineTo(x + size * 0.5, y + 23);
+      ctx.moveTo(x + 4, y + 23);
+      ctx.lineTo(x + size - 4, y + 23);
+      ctx.moveTo(x + size * 0.28, y + 23);
+      ctx.lineTo(x + size * 0.28, y + size - 4);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x + 6, y + 14);
+      ctx.lineTo(x + size * 0.44, y + 14);
+      ctx.moveTo(x + size * 0.34, y + 26);
+      ctx.lineTo(x + size - 6, y + 26);
+      ctx.stroke();
     } else if (b.type === 'bridge') {
+      // Sky bridge plank deck with rope lashings & side brackets (exact 40x16 hitbox)
       ctx.fillStyle = def.color;
       ctx.strokeStyle = def.trimColor;
       ctx.lineWidth = 2.2;
@@ -369,16 +441,24 @@ export function renderOpenWorldBlocks(ctx, owState, time, hoverCell = null, sele
       ctx.stroke();
 
       ctx.fillStyle = def.topColor;
-      ctx.fillRect(x + 3, y + 3, size - 6, 4);
+      ctx.fillRect(x + 3, y + 2.5, size - 6, 4);
 
-      ctx.strokeStyle = 'rgba(75, 47, 29, 0.55)';
-      ctx.lineWidth = 1.5;
+      // Crossbeam plank slats & brass rivets
+      ctx.strokeStyle = 'rgba(75, 47, 29, 0.6)';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.moveTo(x + 13, y + 2);
       ctx.lineTo(x + 13, y + 15);
       ctx.moveTo(x + 27, y + 2);
       ctx.lineTo(x + 27, y + 15);
       ctx.stroke();
+
+      ctx.fillStyle = '#FCD34D';
+      ctx.beginPath();
+      ctx.arc(x + 6, y + 11, 1.4, 0, Math.PI * 2);
+      ctx.arc(x + 20, y + 11, 1.4, 0, Math.PI * 2);
+      ctx.arc(x + 34, y + 11, 1.4, 0, Math.PI * 2);
+      ctx.fill();
     } else if (b.type === 'lantern') {
       const cx = x + size * 0.5;
       const pulse = 0.92 + Math.sin(time * 4 + b.gx) * 0.08;
@@ -391,20 +471,33 @@ export function renderOpenWorldBlocks(ctx, owState, time, hoverCell = null, sele
       ctx.arc(cx, y + 16, 17 * pulse, 0, Math.PI * 2);
       ctx.fill();
 
+      // Wrought-iron post & base foot
       ctx.strokeStyle = '#2B223D';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3.2;
       ctx.beginPath();
       ctx.moveTo(cx, y + size);
       ctx.lineTo(cx, y + 24);
+      ctx.moveTo(cx - 7, y + size - 1);
+      ctx.lineTo(cx + 7, y + size - 1);
       ctx.stroke();
 
+      // Warm glass housing
       ctx.fillStyle = '#FFE496';
       ctx.strokeStyle = '#241B35';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(cx - 8, y + 8, 16, 18, 6);
+      ctx.roundRect(cx - 8, y + 8, 16, 18, 5);
       ctx.fill();
       ctx.stroke();
+
+      // Lantern finial roof
+      ctx.fillStyle = '#2B223D';
+      ctx.beginPath();
+      ctx.moveTo(cx - 10, y + 9);
+      ctx.lineTo(cx, y + 2);
+      ctx.lineTo(cx + 10, y + 9);
+      ctx.closePath();
+      ctx.fill();
 
       ctx.fillStyle = '#FFFDF2';
       ctx.beginPath();
@@ -428,6 +521,10 @@ export function renderOpenWorldBlocks(ctx, owState, time, hoverCell = null, sele
         ctx.arc(fx + sway, y + size - 22, 4.6, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+        ctx.fillStyle = '#FFF6C8';
+        ctx.beginPath();
+        ctx.arc(fx + sway, y + size - 22, 1.6, 0, Math.PI * 2);
+        ctx.fill();
       }
     } else if (b.type === 'arch') {
       const cx = x + size * 0.5;
@@ -443,6 +540,15 @@ export function renderOpenWorldBlocks(ctx, owState, time, hoverCell = null, sele
       ctx.strokeStyle = '#4B2C3E';
       ctx.lineWidth = 1.8;
       ctx.stroke();
+
+      // Base stone pedestals
+      ctx.fillStyle = '#9E93B8';
+      ctx.strokeStyle = '#2D223B';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(cx - 20, y + size - 6, 8, 6);
+      ctx.strokeRect(cx - 20, y + size - 6, 8, 6);
+      ctx.fillRect(cx + 12, y + size - 6, 8, 6);
+      ctx.strokeRect(cx + 12, y + size - 6, 8, 6);
 
       [
         [cx - 13, y + 4, '#F59BB2'],
@@ -466,8 +572,8 @@ export function renderOpenWorldBlocks(ctx, owState, time, hoverCell = null, sele
     const occupied = owState.blocks.has(blockKey(hoverCell.gx, hoverCell.gy));
     const def = OPEN_WORLD_BLOCKS[selectedType];
     ctx.save();
-    ctx.strokeStyle = occupied ? 'rgba(248, 113, 113, 0.88)' : 'rgba(255, 240, 178, 0.85)';
-    ctx.fillStyle = occupied ? 'rgba(248, 113, 113, 0.14)' : 'rgba(255, 240, 178, 0.14)';
+    ctx.strokeStyle = occupied ? 'rgba(248, 113, 113, 0.9)' : 'rgba(255, 240, 178, 0.88)';
+    ctx.fillStyle = occupied ? 'rgba(248, 113, 113, 0.16)' : 'rgba(255, 240, 178, 0.16)';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 4]);
     ctx.beginPath();

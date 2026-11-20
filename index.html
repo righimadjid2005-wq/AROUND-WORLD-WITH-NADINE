@@ -235,150 +235,308 @@
             </div>
           </div>
 
-          <!-- Top-Right Compact Utility Controls -->
-          <div class="hud-cluster hud-utility-cluster">
-            <button
-              type="button"
-              id="hud-btn-coop"
-              class="hud-icon-btn"
-              tabindex="-1"
-              title="Online 2-Player Co-op"
-              aria-label="Open online co-op lobby"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="9" cy="8.5" r="3" fill="none" stroke="currentColor" stroke-width="2" />
-                <circle cx="16.5" cy="9.5" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
-                <path
-                  d="M3.5 18.5c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M14.5 18.5c.4-2 1.8-3.3 3.6-3.3 1.4 0 2.5.8 3.2 2.2"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                />
-              </svg>
-              <span class="hud-btn-label">Co-op</span>
-            </button>
+          <!-- Top-Right Compact Utility Controls + Quick Emotes/Pings -->
+          <div class="hud-right-col">
+            <div class="hud-cluster hud-utility-cluster">
+              <button
+                type="button"
+                id="hud-btn-coop"
+                class="hud-icon-btn"
+                tabindex="-1"
+                title="Online 2-Player Co-op"
+                aria-label="Open online co-op lobby"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="9" cy="8.5" r="3" fill="none" stroke="currentColor" stroke-width="2" />
+                  <circle cx="16.5" cy="9.5" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+                  <path
+                    d="M3.5 18.5c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M14.5 18.5c.4-2 1.8-3.3 3.6-3.3 1.4 0 2.5.8 3.2 2.2"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <span class="hud-btn-label">Co-op</span>
+              </button>
 
-            <button
-              type="button"
-              id="hud-btn-skins"
-              class="hud-icon-btn"
-              tabindex="-1"
-              title="Customize Skins"
-              aria-label="Open skin selector"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M12 3a9 9 0 0 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a1.5 1.5 0 0 1 0-3h4a5 5 0 0 0 5-5c0-2.8-3.8-5-9-5Z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linejoin="round"
-                />
-                <circle cx="8.5" cy="10.5" r="1.2" fill="currentColor" />
-                <circle cx="12" cy="8" r="1.2" fill="currentColor" />
-                <circle cx="15.5" cy="10" r="1.2" fill="currentColor" />
-              </svg>
-              <span class="hud-btn-label">Skins</span>
-            </button>
+              <button
+                type="button"
+                id="hud-btn-skins"
+                class="hud-icon-btn"
+                tabindex="-1"
+                title="Customize Skins"
+                aria-label="Open skin selector"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 3a9 9 0 0 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a1.5 1.5 0 0 1 0-3h4a5 5 0 0 0 5-5c0-2.8-3.8-5-9-5Z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                  <circle cx="8.5" cy="10.5" r="1.2" fill="currentColor" />
+                  <circle cx="12" cy="8" r="1.2" fill="currentColor" />
+                  <circle cx="15.5" cy="10" r="1.2" fill="currentColor" />
+                </svg>
+                <span class="hud-btn-label">Skins</span>
+              </button>
 
-            <button
-              type="button"
-              id="hud-btn-chat"
-              class="hud-icon-btn"
-              tabindex="-1"
-              title="Toggle Chat Box (T)"
-              aria-label="Toggle chat box"
-              aria-expanded="false"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7A2.5 2.5 0 0 1 16.5 16H10l-4.2 3.2A.5.5 0 0 1 5 18.8V6.5Z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              <span class="hud-btn-label">Chat</span>
-            </button>
+              <button
+                type="button"
+                id="hud-btn-chat"
+                class="hud-icon-btn"
+                tabindex="-1"
+                title="Toggle Chat Box (T)"
+                aria-label="Toggle chat box"
+                aria-expanded="false"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7A2.5 2.5 0 0 1 16.5 16H10l-4.2 3.2A.5.5 0 0 1 5 18.8V6.5Z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span class="hud-btn-label">Chat</span>
+              </button>
 
-            <button
-              type="button"
-              id="hud-btn-restart"
-              class="hud-icon-btn"
-              tabindex="-1"
-              title="Restart Chapter (R)"
-              aria-label="Restart chapter"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M4 12a8 8 0 1 0 2.3-5.6L4 8.7M4 4.5v4.2h4.2"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </button>
+              <button
+                type="button"
+                id="hud-btn-restart"
+                class="hud-icon-btn"
+                tabindex="-1"
+                title="Restart Chapter (R)"
+                aria-label="Restart chapter"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M4 12a8 8 0 1 0 2.3-5.6L4 8.7M4 4.5v4.2h4.2"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
 
-            <button
-              type="button"
-              id="hud-btn-mute"
-              class="hud-icon-btn"
-              tabindex="-1"
-              title="Mute or Unmute SFX (M)"
-              aria-label="Mute sound effects"
-              aria-pressed="false"
-            >
-              <svg id="icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M5 9.5h3.5L13 5.5v13l-4.5-4H5v-5Z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M16.5 8.8a4.8 4.8 0 0 1 0 6.4M19 6.2a8.4 8.4 0 0 1 0 11.6"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                />
-              </svg>
-              <svg id="icon-sound-off" class="hidden" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M5 9.5h3.5L13 5.5v13l-4.5-4H5v-5Z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M16.5 9.5l5 5M21.5 9.5l-5 5"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </button>
+              <button
+                type="button"
+                id="hud-btn-mute"
+                class="hud-icon-btn"
+                tabindex="-1"
+                title="Mute or Unmute SFX (M)"
+                aria-label="Mute sound effects"
+                aria-pressed="false"
+              >
+                <svg id="icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M5 9.5h3.5L13 5.5v13l-4.5-4H5v-5Z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M16.5 8.8a4.8 4.8 0 0 1 0 6.4M19 6.2a8.4 8.4 0 0 1 0 11.6"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <svg id="icon-sound-off" class="hidden" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M5 9.5h3.5L13 5.5v13l-4.5-4H5v-5Z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M16.5 9.5l5 5M21.5 9.5l-5 5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </button>
 
-            <button
-              type="button"
-              id="hud-btn-pause"
-              class="hud-icon-btn"
-              tabindex="-1"
-              title="Pause (Esc)"
-              aria-label="Pause game"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
-                <rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
-              </svg>
-            </button>
+              <button
+                type="button"
+                id="hud-btn-scrapbook"
+                class="hud-icon-btn"
+                tabindex="-1"
+                title="Memory Scrapbook"
+                aria-label="Open memory scrapbook"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="4" y="5" width="16" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+                  <circle cx="9.5" cy="10.5" r="1.5" fill="currentColor" />
+                  <path d="M5 16l4.5-4 3.5 3 2.5-2 3.5 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span class="hud-btn-label">Album</span>
+                <span id="scrapbook-badge" class="hud-mini-badge hidden">0</span>
+              </button>
+
+              <button
+                type="button"
+                id="hud-btn-fullscreen"
+                class="hud-icon-btn"
+                tabindex="-1"
+                title="Toggle Fullscreen"
+                aria-label="Toggle fullscreen"
+                aria-pressed="false"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                id="hud-btn-pause"
+                class="hud-icon-btn"
+                tabindex="-1"
+                title="Pause (Esc)"
+                aria-label="Pause game"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
+                  <rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Synchronized Quick Emotes, Carry, Dance, Photo & Ping Strip -->
+            <div class="hud-secondary-strips">
+              <div id="hud-action-strip" class="hud-cluster emote-bar" role="toolbar" aria-label="Cooperative actions">
+                <button
+                  type="button"
+                  id="hud-btn-carry"
+                  class="hud-action-pill"
+                  tabindex="-1"
+                  title="Carry or Drop Partner / Rescue (E)"
+                  aria-label="Carry partner or rescue"
+                >
+                  <span id="hud-carry-label">Carry</span>
+                  <span class="emote-key">E</span>
+                </button>
+                <button
+                  type="button"
+                  id="hud-btn-dance"
+                  class="hud-action-pill"
+                  tabindex="-1"
+                  title="Dance Menu & Co-op Dance Invite (G)"
+                  aria-label="Open dance menu"
+                  aria-expanded="false"
+                >
+                  <span>Dance</span>
+                  <span class="emote-key">G</span>
+                </button>
+                <button
+                  type="button"
+                  id="hud-btn-photo"
+                  class="hud-action-pill"
+                  tabindex="-1"
+                  title="Snap Memory Photo (F)"
+                  aria-label="Snap memory photo"
+                >
+                  <span>Photo</span>
+                  <span class="emote-key">F</span>
+                </button>
+              </div>
+
+              <div id="emote-bar" class="hud-cluster emote-bar" role="toolbar" aria-label="Quick emotes and ping">
+                <button
+                  type="button"
+                  class="emote-btn"
+                  data-emote="heart"
+                  tabindex="-1"
+                  title="Send Heart (1)"
+                  aria-label="Send Heart emote (Key 1)"
+                >
+                  <span aria-hidden="true">&#9829;</span>
+                  <span class="emote-key">1</span>
+                </button>
+                <button
+                  type="button"
+                  class="emote-btn"
+                  data-emote="wave"
+                  tabindex="-1"
+                  title="Wave Hello (2)"
+                  aria-label="Wave Hello emote (Key 2)"
+                >
+                  <span aria-hidden="true">&#128075;</span>
+                  <span class="emote-key">2</span>
+                </button>
+                <button
+                  type="button"
+                  class="emote-btn"
+                  data-emote="cheer"
+                  tabindex="-1"
+                  title="Cheer Sparkle (3)"
+                  aria-label="Cheer Sparkle emote (Key 3)"
+                >
+                  <span aria-hidden="true">&#10022;</span>
+                  <span class="emote-key">3</span>
+                </button>
+                <button
+                  type="button"
+                  class="emote-btn"
+                  data-emote="ping"
+                  tabindex="-1"
+                  title="Ping Location (4)"
+                  aria-label="Ping location beacon (Key 4)"
+                >
+                  <span aria-hidden="true">&#9678;</span>
+                  <span class="emote-key">4</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Compact 8-Dance Selector + Co-op Dance Invite Popover -->
+            <div id="dance-popover" class="dance-popover hidden" role="dialog" aria-label="Choose a dance">
+              <div class="dance-popover-header">
+                <span class="dance-popover-title">Choose a Dance</span>
+                <label class="dance-invite-toggle">
+                  <input type="checkbox" id="dance-invite-coop-chk" />
+                  <span>Invite Partner</span>
+                </label>
+              </div>
+              <div id="dance-grid" class="dance-grid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Centered Non-Blocking Alerts & Boss Bar -->
+        <div id="hud-banners" class="hud-banners">
+          <div id="ghost-warning-banner" class="ghost-warning-banner hidden" role="alert">
+            Return to your partner or the ghost will devour you!
+          </div>
+
+          <div id="hud-boss-bar" class="hud-boss-bar hidden" role="status" aria-live="polite">
+            <div class="boss-bar-header">
+              <span id="boss-bar-name" class="boss-bar-name">Guardian</span>
+              <span id="boss-bar-hp" class="boss-bar-hp tabular-nums">HP: 3/3</span>
+              <span id="boss-bar-status" class="boss-bar-status">Crown Open · Stomp!</span>
+            </div>
+            <div class="boss-bar-track" aria-hidden="true">
+              <div id="boss-bar-fill" class="boss-bar-fill" style="width: 100%"></div>
+            </div>
+          </div>
+
+          <div id="dance-invite-banner" class="dance-invite-banner hidden" role="status" aria-live="polite">
+            <span id="dance-invite-text" class="dance-invite-text">Partner invited you to dance!</span>
+            <div class="dance-invite-actions">
+              <button type="button" id="btn-dance-accept" class="coop-mini-btn coop-mini-gold">Accept</button>
+              <button type="button" id="btn-dance-decline" class="coop-mini-btn">Decline</button>
+            </div>
           </div>
         </div>
 
@@ -407,6 +565,12 @@
               </button>
               <button type="button" id="btn-openworld-sky" class="ow-action-btn" tabindex="-1">
                 Sky: Dawn
+              </button>
+              <button type="button" id="btn-openworld-weather" class="ow-action-btn" tabindex="-1">
+                Weather: Clear
+              </button>
+              <button type="button" id="btn-openworld-boss" class="ow-action-btn" tabindex="-1">
+                Boss
               </button>
               <button type="button" id="btn-openworld-story" class="ow-action-btn ow-story-btn" tabindex="-1">
                 Story
@@ -477,6 +641,15 @@
           </div>
 
           <div class="touch-group touch-right-group">
+            <button
+              type="button"
+              id="touch-action-e"
+              class="touch-btn touch-switch-btn"
+              data-action="carry"
+              aria-label="Carry or rescue partner"
+            >
+              <span>Carry</span>
+            </button>
             <button
               type="button"
               id="touch-switch"
@@ -879,6 +1052,39 @@
                 <p class="coop-empty-text">Connect to view active rooms.</p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MEMORY SCRAPBOOK MODAL -->
+      <section
+        id="scrapbook-modal"
+        class="overlay-layer modal-backdrop hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="scrapbook-title"
+      >
+        <div class="modal-card modal-card-wide">
+          <div class="modal-header-row">
+            <div>
+              <h2 id="scrapbook-title" class="modal-title">Memory Scrapbook</h2>
+              <p class="modal-subtitle" id="scrapbook-count">0 Memories Saved</p>
+            </div>
+            <button
+              type="button"
+              id="btn-close-scrapbook"
+              class="modal-close-icon"
+              aria-label="Close memory scrapbook"
+            >
+              &times;
+            </button>
+          </div>
+
+          <div id="scrapbook-grid" class="scrapbook-grid"></div>
+
+          <div class="modal-footer-row">
+            <button type="button" id="btn-scrapbook-clear" class="btn-ghost">Clear Album</button>
+            <button type="button" id="btn-scrapbook-done" class="btn-primary">Close</button>
           </div>
         </div>
       </section>

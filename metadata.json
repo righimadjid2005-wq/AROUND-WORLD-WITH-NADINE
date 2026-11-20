@@ -1,0 +1,6 @@
+{
+  "name": "Around the World with Nadine",
+  "description": "A cozy cooperative 2D puzzle-platformer following Madjid and Nadine as they travel across sunlit valleys, sunset arches, and starry passes together before their wedding.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

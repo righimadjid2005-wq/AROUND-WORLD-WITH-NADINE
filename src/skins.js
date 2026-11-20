@@ -655,25 +655,78 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
   const palette = skin.palette;
 
   const isCrying = (actor.hurtTimer ?? 0) > 0;
+  const isShocked = actor.mood === 'shocked';
+  const isPanic = actor.mood === 'panic';
+  const isCarried = Boolean(actor.carriedBy);
   const isKissing = actor.mood === 'kissing';
-  const isWorried = actor.mood === 'worried' && !isCrying;
-  const isHappy = !!actor.inPortal || actor.mood === 'happy';
+  const isBlushing = (actor.blushTimer ?? 0) > 0;
+  const isWorried = actor.mood === 'worried' && !isCrying && !isShocked;
+  const isHappy = !!actor.inPortal || actor.mood === 'happy' || isBlushing || Boolean(actor.danceStyle);
   const invulnFlash = (actor.invulnTimer ?? 0) > 0 && Math.floor(time * 16) % 2 === 0;
 
   const cx = actor.x + actor.w * 0.5;
   const bottomY = actor.y + actor.h;
   const idleBreath =
-    actor.grounded && Math.abs(actor.vx || 0) < 12 && !isCrying
+    actor.grounded && Math.abs(actor.vx || 0) < 12 && !isCrying && !isShocked
       ? Math.sin(time * 3.4 + (actor.id === 'nadine' ? 1.4 : 0))
       : 0;
-  const cryTrembleX = isCrying ? Math.sin(time * 42) * 1.8 : 0;
-  const sx = (actor.scaleX ?? 1) * (1 + idleBreath * 0.025);
-  const sy = (actor.scaleY ?? 1) * (1 - idleBreath * 0.025);
+  const cryTrembleX = isShocked ? Math.sin(time * 68) * 3.2 : isCrying ? Math.sin(time * 42) * 1.8 : 0;
+
+  // Dance kinetic offsets (purely visual)
+  let danceOffsetX = 0;
+  let danceOffsetY = 0;
+  let danceRot = 0;
+  let danceSx = 1;
+  let danceSy = 1;
+  if (actor.danceStyle && !isCrying && !isShocked && !isPanic) {
+    const dp = time * (actor.danceTempo || 6.5);
+    switch (actor.danceStyle) {
+      case 'waltz':
+        danceOffsetX = Math.sin(dp * 0.5) * 4;
+        danceRot = Math.sin(dp * 0.5) * 0.14;
+        danceOffsetY = Math.abs(Math.cos(dp * 0.5)) * 4;
+        break;
+      case 'hop':
+        danceOffsetY = Math.abs(Math.sin(dp * 1.1)) * 10;
+        danceSy = 1 + Math.sin(dp * 2.2) * 0.08;
+        danceSx = 1 - Math.sin(dp * 2.2) * 0.06;
+        break;
+      case 'disco':
+        danceRot = Math.sin(dp) * 0.18;
+        danceOffsetY = Math.abs(Math.sin(dp * 1.2)) * 5;
+        break;
+      case 'moonwalk':
+        danceOffsetX = Math.sin(dp * 0.8) * 6;
+        danceRot = -0.1 * (actor.facing || 1);
+        break;
+      case 'spin':
+        danceSx = Math.cos(dp * 1.4) * 0.92;
+        if (Math.abs(danceSx) < 0.25) danceSx = danceSx >= 0 ? 0.25 : -0.25;
+        danceOffsetY = Math.abs(Math.sin(dp)) * 5;
+        break;
+      case 'wave_arms':
+        danceRot = Math.sin(dp * 1.3) * 0.12;
+        danceOffsetY = Math.abs(Math.sin(dp)) * 3;
+        break;
+      case 'skip':
+        danceOffsetY = Math.abs(Math.sin(dp * 1.4)) * 8;
+        danceOffsetX = Math.sin(dp * 0.7) * 5;
+        break;
+      case 'celebrate':
+      default:
+        danceOffsetY = Math.abs(Math.sin(dp * 1.6)) * 12;
+        danceRot = Math.sin(dp * 1.6) * 0.15;
+        break;
+    }
+  }
+
+  const sx = (actor.scaleX ?? 1) * (1 + idleBreath * 0.025) * danceSx;
+  const sy = (actor.scaleY ?? 1) * (1 - idleBreath * 0.025) * danceSy;
 
   const walkPhase = (actor.walkDist ?? 0) * 0.14;
   const moving = Math.abs(actor.vx || 0) > 15 && actor.grounded && !isCrying;
   const hopBob = moving ? Math.abs(Math.sin(walkPhase)) * 2.4 : 0;
-  const kissLeanAngle = actor.kissLean ?? 0;
+  const kissLeanAngle = (actor.kissLean ?? 0) + danceRot;
 
   ctx.save();
   if (invulnFlash) {
@@ -681,11 +734,11 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
   }
 
   // Soft ground shadow / active glow halo
-  if (actor.grounded) {
+  if (actor.grounded && !isCarried) {
     ctx.save();
     ctx.fillStyle = 'rgba(18, 24, 42, 0.24)';
     ctx.beginPath();
-    ctx.ellipse(cx, bottomY + 1, 15 * sx, 4.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, bottomY + 1, 15 * Math.abs(sx), 4.2, 0, 0, Math.PI * 2);
     ctx.fill();
 
     if (isActive && showIndicator) {
@@ -698,8 +751,8 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
     ctx.restore();
   }
 
-  // Anchor squash, stretch, and gentle kiss lean cleanly at feet
-  ctx.translate(cx + cryTrembleX, bottomY - hopBob);
+  // Anchor squash, stretch, and gentle kiss/dance lean cleanly at feet
+  ctx.translate(cx + cryTrembleX + danceOffsetX, bottomY - hopBob - danceOffsetY);
   if (Math.abs(kissLeanAngle) > 0.001) {
     ctx.rotate(kissLeanAngle);
   }
@@ -814,21 +867,50 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
   const eyeY = -2.2;
   const isBlinking = (actor.blinkTimer ?? 2) < 0.11;
 
-  // Rosy cheeks (warmer & fuller during automatic kiss!)
-  ctx.fillStyle = isKissing ? 'rgba(255, 104, 146, 0.82)' : palette.cheek;
-  const cheekRx = isKissing ? 4.6 : 3.6;
-  const cheekRy = isKissing ? 2.9 : 2.2;
+  // Rosy cheeks (warmer & fuller during automatic kiss or love reaction blush!)
+  const warmBlush = isKissing || isBlushing;
+  ctx.fillStyle = warmBlush ? 'rgba(255, 92, 138, 0.86)' : palette.cheek;
+  const cheekRx = warmBlush ? 4.9 : 3.6;
+  const cheekRy = warmBlush ? 3.1 : 2.2;
   ctx.beginPath();
   ctx.ellipse(faceShiftX - 9.0, eyeY + 5.2, cheekRx, cheekRy, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
   ctx.ellipse(faceShiftX + 9.0, eyeY + 5.2, cheekRx, cheekRy, 0, 0, Math.PI * 2);
   ctx.fill();
+  if (isBlushing) {
+    ctx.strokeStyle = 'rgba(255, 66, 114, 0.68)';
+    ctx.lineWidth = 1.25;
+    [-9.0, 9.0].forEach((bx) => {
+      ctx.beginPath();
+      ctx.moveTo(faceShiftX + bx - 2.2, eyeY + 4.3);
+      ctx.lineTo(faceShiftX + bx - 0.8, eyeY + 6.1);
+      ctx.moveTo(faceShiftX + bx + 0.6, eyeY + 4.3);
+      ctx.lineTo(faceShiftX + bx + 2.0, eyeY + 6.1);
+      ctx.stroke();
+    });
+  }
 
-  // Expressive Eyes (Crying > <, Kissing/Happy ^ ^, Blinking, Worried, or Normal Sparkle)
+  // Expressive Eyes (Shocked @.@ / wide pinpoint, Panic, Crying > <, Kissing/Happy ^ ^, Blinking, Worried, or Normal Sparkle)
   [-5.1, 5.1].forEach((exOffset, idx) => {
     const ex = faceShiftX + exOffset;
-    if (isCrying) {
+    if (isShocked || isPanic) {
+      // Wide bulging white sclera with tiny quivering pinpoint pupils
+      const er = isShocked ? 5.3 : 4.8;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = palette.outline;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(ex, eyeY - 0.5, er, er * 1.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      const jit = Math.sin(time * 55 + idx * 2) * 0.7;
+      ctx.fillStyle = '#181024';
+      ctx.beginPath();
+      ctx.arc(ex + jit, eyeY - 0.3, isShocked ? 1.25 : 1.7, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (isCrying) {
       // Cute scrunched > < tearful eyes with shiny tear pools
       ctx.strokeStyle = palette.pupil;
       ctx.lineWidth = 2.2;
@@ -893,7 +975,24 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
   ctx.lineWidth = 1.8;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  if (isCrying) {
+  if (isShocked) {
+    // Open shocked scream O-mouth + electric zigzag hair spike
+    ctx.fillStyle = '#2A1228';
+    ctx.beginPath();
+    ctx.ellipse(faceShiftX, eyeY + 6.4, 3.4, 4.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  } else if (isPanic) {
+    ctx.fillStyle = '#2A1228';
+    ctx.beginPath();
+    ctx.ellipse(faceShiftX, eyeY + 6.0, 2.8, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Panic sweat drop
+    ctx.fillStyle = '#93C5FD';
+    ctx.beginPath();
+    ctx.arc(-14, -12 + Math.sin(time * 18) * 1.5, 2.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (isCrying) {
     // Quivering tiny sad wavy mouth
     const q = Math.sin(time * 26) * 0.7;
     ctx.moveTo(faceShiftX - 3.2, eyeY + 6.5 + q);
@@ -916,9 +1015,38 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
     ctx.stroke();
   }
 
+  // Cheerful waving arms during wave_arms / disco / celebrate dance styles
+  if (actor.danceStyle && (actor.danceStyle === 'wave_arms' || actor.danceStyle === 'disco' || actor.danceStyle === 'celebrate')) {
+    const wave = Math.sin(time * 11) * 5;
+    ctx.fillStyle = palette.body;
+    ctx.strokeStyle = palette.outline;
+    ctx.lineWidth = 1.9;
+    [-16, 16].forEach((ax, i) => {
+      const ay = actor.danceStyle === 'disco' ? (i === 0 ? -12 + wave : 2 - wave) : -9 + (i === 0 ? wave : -wave);
+      ctx.beginPath();
+      ctx.arc(ax, ay, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+  }
+
   // Front accessories (scarf knot, bow, flower, goggles, hat, crown)
   if (typeof skin.drawFront === 'function') {
     skin.drawFront(ctx, renderState);
+  }
+
+  // Startled shock lightning sparks directly above head when shocked
+  if (isShocked) {
+    ctx.strokeStyle = '#FACC15';
+    ctx.lineWidth = 2.2;
+    [-11, 0, 11].forEach((lx, i) => {
+      const jy = -24 + ((i % 2) * 3);
+      ctx.beginPath();
+      ctx.moveTo(lx, jy + 5);
+      ctx.lineTo(lx - 2, jy);
+      ctx.lineTo(lx + 2, jy - 4);
+      ctx.stroke();
+    });
   }
 
   ctx.restore();

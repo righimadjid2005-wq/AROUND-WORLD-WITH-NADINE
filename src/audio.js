@@ -324,6 +324,93 @@ export function createAudioEngine() {
     });
   }
 
+  function playEmoteChime(emoteId = 'heart') {
+    if (emoteId === 'ping') {
+      playTone({ freq: 880, endFreq: 1318.5, type: 'sine', duration: 0.12, gain: 0.07 });
+      playTone({ freq: 1318.5, type: 'sine', duration: 0.18, gain: 0.06, delay: 0.06 });
+    } else if (emoteId === 'wave') {
+      playTone({ freq: 587.33, endFreq: 783.99, type: 'sine', duration: 0.11, gain: 0.065 });
+      playTone({ freq: 783.99, endFreq: 987.77, type: 'sine', duration: 0.13, gain: 0.06, delay: 0.06 });
+    } else {
+      playTone({ freq: 783.99, type: 'sine', duration: 0.12, gain: 0.065 });
+      playTone({ freq: 1046.5, type: 'sine', duration: 0.2, gain: 0.07, delay: 0.06 });
+    }
+  }
+
+  function playHighFive() {
+    playTone({ freq: 659.25, endFreq: 987.77, type: 'triangle', duration: 0.1, gain: 0.09 });
+    playTone({ freq: 1046.5, endFreq: 1567.98, type: 'sine', duration: 0.18, gain: 0.08, delay: 0.045 });
+  }
+
+  function playGhostWarn() {
+    playTone({ freq: 220, endFreq: 164.81, type: 'sawtooth', duration: 0.24, gain: 0.045, attack: 0.02 });
+    playTone({ freq: 311.13, endFreq: 233.08, type: 'triangle', duration: 0.28, gain: 0.055, delay: 0.08 });
+  }
+
+  function playGhostShock() {
+    // Dramatic jolt + dissonant electric zap
+    playTone({ freq: 110, endFreq: 48, type: 'sawtooth', duration: 0.36, gain: 0.14, attack: 0.004 });
+    playTone({ freq: 880, endFreq: 210, type: 'square', duration: 0.22, gain: 0.09, attack: 0.002 });
+    playTone({ freq: 1240, endFreq: 520, type: 'sawtooth', duration: 0.18, gain: 0.075, delay: 0.05 });
+  }
+
+  function playGhostSlap() {
+    playTone({ freq: 620, endFreq: 140, type: 'square', duration: 0.09, gain: 0.12, attack: 0.002 });
+    playTone({ freq: 940, endFreq: 280, type: 'triangle', duration: 0.12, gain: 0.09, delay: 0.025 });
+  }
+
+  function playGhostDevour() {
+    playTone({ freq: 195, endFreq: 72, type: 'sawtooth', duration: 0.34, gain: 0.11, attack: 0.01 });
+    playTone({ freq: 140, endFreq: 240, type: 'triangle', duration: 0.2, gain: 0.08, delay: 0.14 });
+  }
+
+  function playBonesDrop() {
+    [760, 580, 910, 640].forEach((freq, i) => {
+      playTone({ freq, endFreq: freq * 0.72, type: 'triangle', duration: 0.06, gain: 0.065, delay: i * 0.045, attack: 0.002 });
+    });
+  }
+
+  function playCarryPickup() {
+    playTone({ freq: 392, endFreq: 587.33, type: 'sine', duration: 0.12, gain: 0.08 });
+    playTone({ freq: 587.33, endFreq: 783.99, type: 'triangle', duration: 0.12, gain: 0.06, delay: 0.04 });
+  }
+
+  function playCarryDrop() {
+    playTone({ freq: 523.25, endFreq: 349.23, type: 'sine', duration: 0.12, gain: 0.075 });
+  }
+
+  function playDanceStep(stepIdx = 0, style = 'waltz') {
+    const scale = style === 'disco'
+      ? [523.25, 659.25, 783.99, 987.77]
+      : [440, 554.37, 659.25, 880];
+    const freq = scale[Math.abs(stepIdx) % scale.length];
+    playTone({ freq, endFreq: freq * 1.06, type: 'sine', duration: 0.09, gain: 0.045, attack: 0.004 });
+  }
+
+  function playEdgeRescue() {
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+      playTone({ freq, type: 'triangle', duration: 0.15, gain: 0.085, delay: i * 0.04 });
+    });
+  }
+
+  function playBossHit() {
+    playTone({ freq: 185, endFreq: 74, type: 'sawtooth', duration: 0.22, gain: 0.13, attack: 0.003 });
+    playTone({ freq: 620, endFreq: 880, type: 'triangle', duration: 0.16, gain: 0.08, delay: 0.04 });
+  }
+
+  function playBossDefeat() {
+    const fanfare = [392, 523.25, 659.25, 783.99, 1046.5, 1318.51];
+    fanfare.forEach((freq, i) => {
+      playTone({ freq, type: i % 2 === 0 ? 'triangle' : 'sine', duration: 0.36, gain: 0.1, delay: i * 0.075 });
+    });
+  }
+
+  function playCameraShutter() {
+    playTone({ freq: 1480, endFreq: 420, type: 'square', duration: 0.035, gain: 0.075, attack: 0.001 });
+    playTone({ freq: 1120, endFreq: 680, type: 'triangle', duration: 0.05, gain: 0.06, delay: 0.045, attack: 0.001 });
+    playTone({ freq: 1046.5, type: 'sine', duration: 0.22, gain: 0.065, delay: 0.09 });
+  }
+
   function isMuted() {
     return muted;
   }
@@ -367,5 +454,19 @@ export function createAudioEngine() {
     playRestart,
     playChatPing,
     playUiClick,
+    playEmoteChime,
+    playHighFive,
+    playGhostWarn,
+    playGhostShock,
+    playGhostSlap,
+    playGhostDevour,
+    playBonesDrop,
+    playCarryPickup,
+    playCarryDrop,
+    playDanceStep,
+    playEdgeRescue,
+    playBossHit,
+    playBossDefeat,
+    playCameraShutter,
   };
 }

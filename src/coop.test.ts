@@ -255,6 +255,63 @@ test('Live WebSocket Co-op Server syncs 2 players across Story, Open-World block
     );
     assert.equal(craftOnMadjid.recipeId, 'craft_lantern');
     assert.equal(craftOnMadjid.craftedTotal, 1);
+
+    // 7. Synchronized quick emote & ping beacon relay
+    madjid.send({ type: 'player:emote', emoteId: 'ping', x: 420, y: 360 });
+    const emoteOnMadjid = await madjid.waitFor((m) => m.type === 'player:emote');
+    const emoteOnNadine = await nadine.waitFor((m) => m.type === 'player:emote');
+    assert.equal(emoteOnMadjid.emoteId, 'ping');
+    assert.equal(emoteOnNadine.character, 'madjid');
+    assert.equal(emoteOnNadine.x, 420);
+
+    // 8. Dual-player world trigger relay (High Five / Lantern Harmony)
+    nadine.send({ type: 'world:trigger', triggerKind: 'highfive', x: 250, y: 290 });
+    const triggerOnMadjid = await madjid.waitFor((m) => m.type === 'world:trigger');
+    assert.equal(triggerOnMadjid.triggerKind, 'highfive');
+    assert.equal(triggerOnMadjid.character, 'nadine');
+
+    // 9. Mutual "I love u" -> "I love u too" live chat sync across both devices
+    madjid.send({ type: 'chat:send', id: 'love-1', text: '  I love u  ' });
+    const love1Nadine = await nadine.waitFor((m) => m.type === 'chat:message' && (m.message as { id: string }).id === 'love-1');
+    assert.equal((love1Nadine.message as { senderId: string }).senderId, 'madjid');
+
+    nadine.send({ type: 'chat:send', id: 'love-2', text: 'I love u too' });
+    const love2Madjid = await madjid.waitFor((m) => m.type === 'chat:message' && (m.message as { id: string }).id === 'love-2');
+    assert.equal((love2Madjid.message as { senderId: string }).senderId, 'nadine');
+
+    // 10. Ghost shock/slap/devour, Carry, Dance Invite/Respond, Boss, Weather & Scrapbook Photo sync
+    madjid.send({ type: 'ghost:sync', kind: 'shock', strayId: 'nadine', outcome: 'slap' });
+    const ghostOnNadine = await nadine.waitFor((m) => m.type === 'ghost:sync' && m.kind === 'shock');
+    assert.equal(ghostOnNadine.outcome, 'slap');
+
+    madjid.send({ type: 'carry:sync', kind: 'pickup', carrierId: 'madjid', carriedId: 'nadine' });
+    const carryOnNadine = await nadine.waitFor((m) => m.type === 'carry:sync' && m.kind === 'pickup');
+    assert.equal(carryOnNadine.carriedId, 'nadine');
+
+    madjid.send({ type: 'dance:invite', styleId: 'waltz', styleName: 'Starlight Waltz' });
+    const inviteOnNadine = await nadine.waitFor((m) => m.type === 'dance:invite');
+    assert.equal(inviteOnNadine.styleId, 'waltz');
+
+    nadine.send({ type: 'dance:respond', accepted: true, styleId: 'waltz' });
+    const respOnMadjid = await madjid.waitFor((m) => m.type === 'dance:respond');
+    assert.equal(respOnMadjid.accepted, true);
+
+    madjid.send({ type: 'boss:sync', kind: 'state', boss: { active: true, hp: 2, maxHp: 3 } });
+    const bossOnNadine = await nadine.waitFor((m) => m.type === 'boss:sync');
+    assert.equal((bossOnNadine.boss as { hp: number }).hp, 2);
+
+    nadine.send({ type: 'weather:sync', weather: 'rain' });
+    const weatherOnMadjid = await madjid.waitFor((m) => m.type === 'weather:sync');
+    assert.equal(weatherOnMadjid.weather, 'rain');
+
+    madjid.send({
+      type: 'photo:snap',
+      photo: { id: 'snap-1', title: 'Sunset Cliff', location: 'W4-1', skyWeather: 'Amber Dusk', capturedAt: '18:30' },
+    });
+    const scrapOnMadjid = await madjid.waitFor((m) => m.type === 'scrapbook:updated');
+    const scrapOnNadine = await nadine.waitFor((m) => m.type === 'scrapbook:updated');
+    assert.equal((scrapOnMadjid.scrapbook as unknown[]).length, 1);
+    assert.equal((scrapOnNadine.photo as { title: string }).title, 'Sunset Cliff');
   } finally {
     await Promise.all([madjid.close(), nadine.close(), third.close()]);
     await coop.close();

@@ -77,6 +77,7 @@ export function createRoomManager() {
       skins: { ...room.skins },
       openWorld: serializeOpenWorldState(room.openWorld),
       chat: room.chat.slice(-40),
+      scrapbook: (room.scrapbook || []).slice(0, 24),
     };
   }
 
@@ -165,6 +166,7 @@ export function createRoomManager() {
       openWorld: createOpenWorldState(null, null, options.theme || 'sunrise'),
       chat: [],
       seenChatIds: new Set(),
+      scrapbook: [],
     };
 
     room.players.set(clientId, {
@@ -418,6 +420,41 @@ export function createRoomManager() {
     return peers;
   }
 
+  function appendScrapbookPhoto(clientId, photo) {
+    const room = getRoomForClient(clientId);
+    if (!room) return { ok: false, error: 'NOT_IN_ROOM' };
+    const player = room.players.get(clientId);
+    if (!player || !photo || typeof photo !== 'object') {
+      return { ok: false, error: 'INVALID_PHOTO' };
+    }
+
+    const sanitized = {
+      id: String(photo.id || `photo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`).slice(0, 48),
+      title: String(photo.title || 'Journey Memory').trim().slice(0, 64),
+      location: String(photo.location || 'Around the World').trim().slice(0, 72),
+      skyWeather: String(photo.skyWeather || 'Golden Dawn').trim().slice(0, 48),
+      capturedAt: String(photo.capturedAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })).slice(0, 24),
+      imageDataUrl:
+        typeof photo.imageDataUrl === 'string' && photo.imageDataUrl.startsWith('data:image/')
+          ? photo.imageDataUrl.slice(0, 120000)
+          : '',
+      byCharacter: player.character,
+    };
+
+    if (!room.scrapbook) room.scrapbook = [];
+    if (!room.scrapbook.some((p) => p.id === sanitized.id)) {
+      room.scrapbook.unshift(sanitized);
+      if (room.scrapbook.length > 24) room.scrapbook.pop();
+    }
+
+    return {
+      ok: true,
+      photo: sanitized,
+      scrapbook: room.scrapbook.slice(0, 24),
+      memberClientIds: Array.from(room.players.keys()),
+    };
+  }
+
   return {
     listRooms,
     createRoom,
@@ -430,6 +467,7 @@ export function createRoomManager() {
     updatePlayerSkin,
     applyOpenWorldAction,
     appendChatMessage,
+    appendScrapbookPhoto,
     getPeerClientIds,
   };
 }

@@ -123,6 +123,30 @@ export const TIME_PRESETS = {
   },
 };
 
+export const WEATHER_PRESETS = {
+  clear: { id: 'clear', label: 'Clear' },
+  rain: { id: 'rain', label: 'Soft Rain' },
+  wind: { id: 'wind', label: 'Breeze & Petals' },
+  fireflies: { id: 'fireflies', label: 'Fireflies' },
+};
+
+export function getWeatherForWorld(worldId) {
+  switch (Number(worldId)) {
+    case 3:
+    case 6:
+      return 'rain';
+    case 4:
+    case 7:
+      return 'wind';
+    case 5:
+    case 8:
+    case 9:
+      return 'fireflies';
+    default:
+      return 'clear';
+  }
+}
+
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
@@ -190,10 +214,27 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
     scale: 0.7 + rand() * 0.4,
   }));
 
+  const raindrops = Array.from({ length: 68 }, () => ({
+    x: rand(),
+    y: rand(),
+    len: 12 + rand() * 14,
+    speed: 0.95 + rand() * 0.55,
+    alpha: 0.28 + rand() * 0.3,
+  }));
+
+  const windRibbons = Array.from({ length: 5 }, (_, i) => ({
+    x: rand(),
+    y: 0.18 + (i / 5) * 0.55,
+    len: 75 + rand() * 75,
+    speed: 0.24 + rand() * 0.14,
+    phase: rand() * Math.PI * 2,
+  }));
+
   let targetName = TIME_PRESETS[initialTheme] ? initialTheme : 'sunrise';
   let current = clonePreset(TIME_PRESETS[targetName]);
   let landmarkStyle = 'cottages';
   let ambientStyle = 'petals';
+  let weatherType = 'clear';
   let customPlatformStyle = null;
 
   function setTheme(themeName, instant = false, options = {}) {
@@ -205,7 +246,20 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
     }
     if (options.landmark) landmarkStyle = options.landmark;
     if (options.ambient) ambientStyle = options.ambient;
+    if (options.weather && WEATHER_PRESETS[options.weather]) {
+      weatherType = options.weather;
+    }
     customPlatformStyle = options.platformPalette || null;
+  }
+
+  function setWeather(weather) {
+    if (WEATHER_PRESETS[weather]) {
+      weatherType = weather;
+    }
+  }
+
+  function getWeather() {
+    return weatherType;
   }
 
   function getThemeName() {
@@ -254,8 +308,9 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
     current.cloudAlpha = lerp(current.cloudAlpha, target.cloudAlpha, blend);
     current.hazeAlpha = lerp(current.hazeAlpha, target.hazeAlpha, blend);
 
+    const windBoost = weatherType === 'wind' ? 2.4 : 1;
     for (let i = 0; i < clouds.length; i++) {
-      clouds[i].x += clouds[i].speed * dt;
+      clouds[i].x += clouds[i].speed * windBoost * dt;
       if (clouds[i].x > 1.25) clouds[i].x = -0.25;
     }
 
@@ -848,11 +903,65 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
     }
 
     // 12. World-Matched Ambient Particles (Fireflies / Petals / Sun Motes)
+    const effectiveAmbient = weatherType === 'fireflies' ? 'fireflies' : weatherType === 'wind' ? 'petals' : ambientStyle;
+    const prevAmbient = ambientStyle;
+    ambientStyle = effectiveAmbient;
     renderAmbientParticles(ctx, width, height, time);
+    ambientStyle = prevAmbient;
+
+    // 13. Weather Overlay (Rain streaks + splashes OR Sweeping Wind gusts)
+    if (weatherType === 'rain') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(18, 28, 54, 0.12)';
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = 'rgba(196, 228, 255, 0.44)';
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let i = 0; i < raindrops.length; i++) {
+        const rd = raindrops[i];
+        const rx = (((rd.x + time * 0.14) % 1 + 1) % 1) * width;
+        const ry = (((rd.y + time * rd.speed) % 1 + 1) % 1) * height;
+        ctx.moveTo(rx, ry);
+        ctx.lineTo(rx - 4, ry + rd.len);
+      }
+      ctx.stroke();
+
+      // Ground rain ripples near lower playfield band
+      ctx.strokeStyle = 'rgba(216, 238, 255, 0.34)';
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 8; i++) {
+        const phase = (time * 1.9 + i * 0.41) % 1;
+        const px = ((i * 0.13 + Math.floor(time * 1.9 + i * 0.41) * 0.19) % 1) * width;
+        const py = height * (0.86 + (i % 3) * 0.04);
+        ctx.globalAlpha = (1 - phase) * 0.45;
+        ctx.beginPath();
+        ctx.ellipse(px, py, 3 + phase * 11, 1.4 + phase * 3.2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (weatherType === 'wind') {
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (let i = 0; i < windRibbons.length; i++) {
+        const wr = windRibbons[i];
+        const rx = (((wr.x + time * wr.speed) % 1.35) - 0.18) * width;
+        const ry = wr.y * height + Math.sin(time * 2.2 + wr.phase) * 14;
+        ctx.strokeStyle = 'rgba(255, 248, 236, 0.22)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(rx, ry);
+        ctx.quadraticCurveTo(rx + wr.len * 0.5, ry - 10, rx + wr.len, ry + 4);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   return {
     setTheme,
+    setWeather,
+    getWeather,
     getThemeName,
     getLandmarkStyle,
     getPlatformStyle,

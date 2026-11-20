@@ -45,6 +45,17 @@ interface IncomingMessage {
   id?: string;
   text?: string;
   timestamp?: string;
+  emoteId?: string;
+  x?: number;
+  y?: number;
+  triggerKind?: string;
+  photo?: unknown;
+  weather?: string;
+  styleId?: string;
+  styleName?: string;
+  accepted?: boolean;
+  boss?: unknown;
+  [key: string]: unknown;
 }
 
 function safeSend(ws: WebSocket, data: Record<string, unknown>): void {
@@ -319,6 +330,67 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
           sendToIds(res.memberClientIds || [], {
             type: 'chat:message',
             message: res.message,
+          });
+          break;
+        }
+
+        case 'player:emote': {
+          const player = manager.getPlayerInRoom(clientId);
+          if (!player || typeof msg.emoteId !== 'string') return;
+          const allowed = new Set(['heart', 'wave', 'cheer', 'ping']);
+          if (!allowed.has(msg.emoteId)) return;
+          const memberIds = [clientId, ...manager.getPeerClientIds(clientId)];
+          sendToIds(memberIds, {
+            type: 'player:emote',
+            character: player.character,
+            emoteId: msg.emoteId,
+            x: typeof msg.x === 'number' ? Math.round(msg.x) : null,
+            y: typeof msg.y === 'number' ? Math.round(msg.y) : null,
+            t: Date.now(),
+          });
+          break;
+        }
+
+        case 'world:trigger': {
+          const player = manager.getPlayerInRoom(clientId);
+          if (!player || typeof msg.triggerKind !== 'string') return;
+          const peers = manager.getPeerClientIds(clientId);
+          if (peers.length === 0) return;
+          sendToIds(peers, {
+            type: 'world:trigger',
+            character: player.character,
+            triggerKind: msg.triggerKind,
+            x: typeof msg.x === 'number' ? Math.round(msg.x) : null,
+            y: typeof msg.y === 'number' ? Math.round(msg.y) : null,
+          });
+          break;
+        }
+
+        case 'ghost:sync':
+        case 'carry:sync':
+        case 'dance:sync':
+        case 'dance:invite':
+        case 'dance:respond':
+        case 'boss:sync':
+        case 'weather:sync': {
+          const player = manager.getPlayerInRoom(clientId);
+          if (!player) return;
+          const peers = manager.getPeerClientIds(clientId);
+          if (peers.length === 0) return;
+          sendToIds(peers, {
+            ...msg,
+            fromCharacter: player.character,
+          });
+          break;
+        }
+
+        case 'photo:snap': {
+          const res = manager.appendScrapbookPhoto(clientId, msg.photo);
+          if (!res.ok) return;
+          sendToIds(res.memberClientIds || [], {
+            type: 'scrapbook:updated',
+            photo: res.photo,
+            scrapbook: res.scrapbook,
           });
           break;
         }
