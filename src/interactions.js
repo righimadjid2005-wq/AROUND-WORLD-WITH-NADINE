@@ -401,14 +401,70 @@ function wrapBubbleLines(ctx, text, maxTextWidth) {
 /**
  * Renders floating `🗨 <message>` speech bubbles directly above Madjid & Nadine in world space.
  */
-export function renderOverheadBubbles(ctx, actors, interactionState) {
+export function renderOverheadBubbles(ctx, actors, interactionState, viewportBounds = null) {
   if (!interactionState || !actors) return;
 
+  const minWorldX =
+    viewportBounds && Number.isFinite(viewportBounds.minX) ? viewportBounds.minX + 10 : 8;
+  const maxWorldX =
+    viewportBounds && Number.isFinite(viewportBounds.maxX) ? viewportBounds.maxX - 10 : Infinity;
+
+  ctx.save();
+  ctx.font = '600 12px "Plus Jakarta Sans", system-ui, sans-serif';
+  const maxTextWidth = BUBBLE_CONFIG.MAX_WIDTH - 22;
+  const padX = 11;
+  const padY = 7;
+  const lineH = 15;
+
+  const entries = [];
   ['madjid', 'nadine'].forEach((cid) => {
     const bubble = interactionState.bubbles[cid];
     const actor = actors[cid];
     if (!bubble || !actor || bubble.life <= 0) return;
 
+    const lines = wrapBubbleLines(ctx, bubble.text, maxTextWidth);
+    let textW = 0;
+    for (let i = 0; i < lines.length; i++) {
+      textW = Math.max(textW, ctx.measureText(lines[i]).width);
+    }
+    const boxW = Math.min(BUBBLE_CONFIG.MAX_WIDTH, Math.max(58, textW + padX * 2));
+    const boxH = lines.length * lineH + padY * 2;
+    const rawCx = actor.x + actor.w * 0.5;
+    const minCx = minWorldX + boxW * 0.5;
+    const maxCx = Number.isFinite(maxWorldX) ? maxWorldX - boxW * 0.5 : Infinity;
+    const cx = minCx <= maxCx ? Math.max(minCx, Math.min(maxCx, rawCx)) : (minCx + maxCx) * 0.5;
+
+    entries.push({
+      cid,
+      bubble,
+      actor,
+      lines,
+      boxW,
+      boxH,
+      rawCx,
+      cx,
+      anchorY: actor.y - 44,
+      stacked: false,
+    });
+  });
+
+  if (entries.length === 2) {
+    const [a, b] = entries;
+    const horizOverlap =
+      Math.min(a.cx + a.boxW * 0.5, b.cx + b.boxW * 0.5) -
+      Math.max(a.cx - a.boxW * 0.5, b.cx - b.boxW * 0.5);
+    const vertOverlap = Math.abs(a.anchorY - b.anchorY) < Math.max(a.boxH, b.boxH) + 14;
+    if (horizOverlap > -10 && vertOverlap) {
+      b.anchorY = a.anchorY - a.boxH - 18;
+      const minCx = minWorldX + b.boxW * 0.5;
+      const maxCx = Number.isFinite(maxWorldX) ? maxWorldX - b.boxW * 0.5 : Infinity;
+      const shiftedCx = b.cx + 26;
+      b.cx = minCx <= maxCx ? Math.max(minCx, Math.min(maxCx, shiftedCx)) : b.cx;
+      b.stacked = true;
+    }
+  }
+
+  entries.forEach(({ cid, bubble, lines, boxW, boxH, rawCx, cx, anchorY, stacked }) => {
     const fadeAlpha =
       bubble.life < BUBBLE_CONFIG.FADE_WINDOW
         ? Math.max(0, bubble.life / BUBBLE_CONFIG.FADE_WINDOW)
@@ -417,67 +473,80 @@ export function renderOverheadBubbles(ctx, actors, interactionState) {
 
     ctx.save();
     ctx.font = '600 12px "Plus Jakarta Sans", system-ui, sans-serif';
-    const maxTextWidth = BUBBLE_CONFIG.MAX_WIDTH - 22;
-    const lines = wrapBubbleLines(ctx, bubble.text, maxTextWidth);
-
-    let textW = 0;
-    for (let i = 0; i < lines.length; i++) {
-      textW = Math.max(textW, ctx.measureText(lines[i]).width);
-    }
-
-    const padX = 11;
-    const padY = 7;
-    const lineH = 15;
-    const boxW = Math.min(BUBBLE_CONFIG.MAX_WIDTH, Math.max(58, textW + padX * 2));
-    const boxH = lines.length * lineH + padY * 2;
-
-    const cx = actor.x + actor.w * 0.5;
-    const anchorY = actor.y - 34;
-
     ctx.globalAlpha = fadeAlpha;
     ctx.translate(cx, anchorY);
     ctx.scale(popScale, popScale);
 
     const x = -boxW * 0.5;
     const y = -boxH - 7;
+    const tailX = Math.max(-boxW * 0.36, Math.min(boxW * 0.36, rawCx - cx));
 
-    // Soft drop shadow
-    ctx.fillStyle = 'rgba(18, 20, 38, 0.22)';
+    // Soft liquid glass shadow
+    ctx.fillStyle = 'rgba(10, 14, 30, 0.28)';
     ctx.beginPath();
-    ctx.roundRect(x + 1, y + 3, boxW, boxH, 11);
+    ctx.roundRect(x + 1, y + 4, boxW, boxH, 14);
     ctx.fill();
 
-    // Warm ivory storybook bubble + dark outline
-    ctx.fillStyle = cid === 'nadine' ? '#FFF5F8' : '#F4FAFF';
-    ctx.strokeStyle = '#241B36';
-    ctx.lineWidth = 2;
+    // Slime Liquid Glass translucent gradient body
+    const glassGrad = ctx.createLinearGradient(x, y, x, y + boxH);
+    if (cid === 'nadine') {
+      glassGrad.addColorStop(0, 'rgba(255, 224, 240, 0.88)');
+      glassGrad.addColorStop(0.45, 'rgba(244, 152, 198, 0.68)');
+      glassGrad.addColorStop(1, 'rgba(128, 42, 92, 0.82)');
+    } else {
+      glassGrad.addColorStop(0, 'rgba(224, 246, 255, 0.88)');
+      glassGrad.addColorStop(0.45, 'rgba(118, 202, 246, 0.68)');
+      glassGrad.addColorStop(1, 'rgba(28, 72, 128, 0.82)');
+    }
+
+    ctx.fillStyle = glassGrad;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.84)';
+    ctx.lineWidth = 1.9;
     ctx.beginPath();
-    ctx.roundRect(x, y, boxW, boxH, 11);
+    ctx.roundRect(x, y, boxW, boxH, 14);
     ctx.fill();
     ctx.stroke();
 
-    // Speech pointer tail
+    // Top specular glass crescent highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.44)';
     ctx.beginPath();
-    ctx.moveTo(-5, y + boxH - 1);
-    ctx.lineTo(0, y + boxH + 7);
-    ctx.lineTo(5, y + boxH - 1);
-    ctx.closePath();
+    ctx.roundRect(x + 6, y + 2.5, Math.max(12, boxW - 12), Math.max(4, boxH * 0.28), 8);
     ctx.fill();
-    ctx.stroke();
 
-    // Seamless inner fill covering tail top border
-    ctx.fillRect(-5, y + boxH - 3, 10, 4);
+    // Liquid glass pointer tail (or compact thought dot when stacked cleanly above partner bubble)
+    ctx.fillStyle = cid === 'nadine' ? 'rgba(148, 54, 108, 0.86)' : 'rgba(34, 84, 142, 0.86)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.84)';
+    ctx.lineWidth = 1.6;
+    if (stacked) {
+      ctx.beginPath();
+      ctx.arc(tailX, y + boxH + 4, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(tailX - 5, y + boxH - 1);
+      ctx.lineTo(tailX, y + boxH + 7);
+      ctx.lineTo(tailX + 5, y + boxH - 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
 
-    // Bubble text
-    ctx.fillStyle = '#1E182E';
+    // Crisp luminous bubble text with soft outline contrast
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = 'rgba(12, 18, 36, 0.78)';
+    ctx.fillStyle = '#FFFFFF';
     for (let i = 0; i < lines.length; i++) {
+      ctx.strokeText(lines[i], 0, y + padY + i * lineH);
       ctx.fillText(lines[i], 0, y + padY + i * lineH);
     }
 
     ctx.restore();
   });
+
+  ctx.restore();
 }
 
 /**

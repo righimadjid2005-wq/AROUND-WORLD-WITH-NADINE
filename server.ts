@@ -64,8 +64,15 @@ function safeSend(ws: WebSocket, data: Record<string, unknown>): void {
   }
 }
 
-export function attachCoopWebSocket(httpServer: HttpServer) {
-  const manager = createRoomManager();
+export function attachCoopWebSocket(
+  httpServer: HttpServer,
+  options: { storagePath?: string } = {}
+) {
+  const storagePath =
+    options.storagePath ||
+    process.env.COOP_STORAGE_PATH ||
+    path.resolve(__dirname, '.data', 'coop-rooms.json');
+  const manager = createRoomManager({ storagePath });
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   const clients = new Map<string, ClientMeta>();
   let nextClientSeq = 1;
@@ -130,7 +137,7 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
 
       switch (msg.type) {
         case 'ping': {
-          safeSend(ws, { type: 'pong', t: Date.now() });
+          safeSend(ws, { type: 'pong', t: Date.now(), clientTs: msg.clientTs ?? null });
           break;
         }
 
@@ -193,6 +200,31 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
           break;
         }
 
+        case 'room:quick_join': {
+          const res = manager.quickJoinRoom(clientId, {
+            character: msg.character,
+            skinId: msg.skinId,
+          });
+          if (!res.ok) {
+            safeSend(ws, { type: 'error', code: res.error, message: res.message });
+            return;
+          }
+          safeSend(ws, {
+            type: 'room:joined',
+            clientId,
+            character: res.character,
+            room: res.room,
+          });
+          const peers = manager.getPeerClientIds(clientId);
+          sendToIds(peers, {
+            type: 'partner:joined',
+            character: res.character,
+            room: res.room,
+          });
+          broadcastLobbyDirectory();
+          break;
+        }
+
         case 'room:leave': {
           const res = manager.leaveRoom(clientId);
           safeSend(ws, { type: 'room:left', code: res.code || null });
@@ -212,6 +244,7 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
             mode: msg.mode,
             levelIndex: msg.levelIndex,
             theme: msg.theme,
+            reset: Boolean(msg.reset),
           });
           if (!res.ok) {
             safeSend(ws, { type: 'error', code: res.error, message: 'Join a room first.' });
@@ -228,6 +261,7 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
         case 'player:state': {
           const player = manager.getPlayerInRoom(clientId);
           if (!player || !msg.state || typeof msg.state !== 'object') return;
+          manager.updatePlayerRuntimeState(clientId, msg.state);
           const peers = manager.getPeerClientIds(clientId);
           if (peers.length === 0) return;
           sendToIds(peers, {
@@ -241,13 +275,7 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
         case 'story:sync': {
           const player = manager.getPlayerInRoom(clientId);
           if (!player || !msg.payload || typeof msg.payload !== 'object') return;
-          if (typeof msg.payload.levelIndex === 'number' && Number.isInteger(msg.payload.levelIndex)) {
-            manager.updateRoomMode(clientId, {
-              mode: undefined,
-              levelIndex: msg.payload.levelIndex,
-              theme: undefined,
-            });
-          }
+          manager.updateStoryProgress(clientId, msg.payload);
           const peers = manager.getPeerClientIds(clientId);
           if (peers.length === 0) return;
           sendToIds(peers, {
@@ -320,6 +348,18 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
           break;
         }
 
+        case 'skin:custom-save': {
+          const res = manager.updateCustomSkin(clientId, msg.skin);
+          if (!res.ok) return;
+          const peers = manager.getPeerClientIds(clientId);
+          sendToIds(peers, {
+            type: 'skin:custom-saved',
+            character: res.character,
+            skin: res.skin,
+          });
+          break;
+        }
+
         case 'chat:send': {
           const res = manager.appendChatMessage(clientId, {
             id: msg.id,
@@ -372,7 +412,11 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
         case 'dance:invite':
         case 'dance:respond':
         case 'boss:sync':
-        case 'weather:sync': {
+        case 'weather:sync':
+        case 'hp:respawn':
+        case 'puzzle:sync':
+        case 'monster:sync':
+        case 'barrier:sync': {
           const player = manager.getPlayerInRoom(clientId);
           if (!player) return;
           const peers = manager.getPeerClientIds(clientId);
@@ -416,6 +460,7 @@ export function attachCoopWebSocket(httpServer: HttpServer) {
 
   function close(): Promise<void> {
     clearInterval(heartbeat);
+    manager.flushSaveSync?.();
     clients.forEach((client) => {
       try {
         client.ws.terminate();
@@ -480,8 +525,26 @@ async function startServer(): Promise<void> {
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: { middlewareMode: true, hmr: false, ws: false },
       appType: 'spa',
+      plugins: [
+        {
+          name: 'disable-vite-hmr-client-ws',
+          enforce: 'post' as const,
+          transform(code: string, id: string) {
+            if (/[\\/]vite[\\/]dist[\\/]client[\\/]client\.mjs/.test(id) || id.endsWith('@vite/client')) {
+              const patched = code.replace(
+                /const transport = normalizeModuleRunnerTransport\(\(\(\) => \{[\s\S]*?\}\)\(\)\);/,
+                'const transport = normalizeModuleRunnerTransport({ async connect() {}, async disconnect() {}, async send() {} });'
+              );
+              if (patched !== code) {
+                return { code: patched, map: null };
+              }
+            }
+            return undefined;
+          },
+        },
+      ],
     });
     app.use(vite.middlewares);
   } else {

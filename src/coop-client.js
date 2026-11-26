@@ -94,6 +94,8 @@ export function createCoopClient(callbacks = {}) {
   let shouldReconnect = false;
   let reconnectAttempt = 0;
   let reconnectTimer = null;
+  let pingInterval = null;
+  let pingMs = null;
   const pendingQueue = [];
 
   function setStatus(nextStatus, detail = '') {
@@ -106,6 +108,26 @@ export function createCoopClient(callbacks = {}) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+  }
+
+  function stopPingLoop() {
+    if (pingInterval) {
+      clearInterval(pingInterval);
+      pingInterval = null;
+    }
+    pingMs = null;
+  }
+
+  function startPingLoop() {
+    stopPingLoop();
+    const sendPing = () => {
+      if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'ping', clientTs: Date.now() }));
+      }
+    };
+    sendPing();
+    pingInterval = setInterval(sendPing, 2000);
+    pingInterval.unref?.();
   }
 
   function sendPacket(packet) {
@@ -167,6 +189,7 @@ export function createCoopClient(callbacks = {}) {
     ws.onopen = () => {
       reconnectAttempt = 0;
       setStatus('connected');
+      startPingLoop();
       flushPending();
       if (activeRoomCode) {
         sendPacket({
@@ -191,6 +214,13 @@ export function createCoopClient(callbacks = {}) {
         case 'welcome':
           clientId = msg.clientId || null;
           callbacks.onRooms?.(msg.rooms || [], '');
+          break;
+
+        case 'pong':
+          if (typeof msg.clientTs === 'number') {
+            pingMs = Math.max(1, Math.min(9999, Date.now() - msg.clientTs));
+            callbacks.onPing?.(pingMs);
+          }
           break;
 
         case 'room:list':
@@ -237,6 +267,10 @@ export function createCoopClient(callbacks = {}) {
           callbacks.onSkinUpdated?.(msg.character, msg.skinId);
           break;
 
+        case 'skin:custom-saved':
+          callbacks.onCustomSkinSaved?.(msg.character, msg.skin);
+          break;
+
         case 'chat:message':
           callbacks.onChatMessage?.(msg.message);
           break;
@@ -277,6 +311,22 @@ export function createCoopClient(callbacks = {}) {
           callbacks.onWeatherSync?.(msg);
           break;
 
+        case 'hp:respawn':
+          callbacks.onHpRespawn?.(msg);
+          break;
+
+        case 'puzzle:sync':
+          callbacks.onPuzzleSync?.(msg);
+          break;
+
+        case 'monster:sync':
+          callbacks.onMonsterSync?.(msg);
+          break;
+
+        case 'barrier:sync':
+          callbacks.onBarrierSync?.(msg);
+          break;
+
         case 'scrapbook:updated':
           callbacks.onScrapbookUpdated?.(msg);
           break;
@@ -296,6 +346,7 @@ export function createCoopClient(callbacks = {}) {
 
     ws.onclose = () => {
       ws = null;
+      stopPingLoop();
       setStatus('disconnected');
       if (shouldReconnect) {
         scheduleReconnect();
@@ -315,6 +366,7 @@ export function createCoopClient(callbacks = {}) {
     activeCharacter = null;
     pendingQueue.length = 0;
     clearReconnectTimer();
+    stopPingLoop();
     if (ws) {
       try {
         ws.close();
@@ -362,14 +414,24 @@ export function createCoopClient(callbacks = {}) {
     });
   }
 
+  function quickJoin({ character, skinId } = {}) {
+    ensureConnected();
+    lastSkinId = skinId || null;
+    sendPacket({
+      type: 'room:quick_join',
+      character,
+      skinId,
+    });
+  }
+
   function leaveRoom() {
     activeRoomCode = null;
     activeCharacter = null;
     sendPacket({ type: 'room:leave' });
   }
 
-  function setRoomMode({ mode, levelIndex, theme }) {
-    sendPacket({ type: 'room:mode', mode, levelIndex, theme });
+  function setRoomMode({ mode, levelIndex, theme, reset = false }) {
+    sendPacket({ type: 'room:mode', mode, levelIndex, theme, reset: Boolean(reset) });
   }
 
   function sendPlayerState(state) {
@@ -458,6 +520,33 @@ export function createCoopClient(callbacks = {}) {
     sendPacket({ type: 'weather:sync', weather });
   }
 
+  function sendCustomSkinSave(skin) {
+    if (!skin || !skin.id) return;
+    lastSkinId = skin.id;
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'skin:custom-save', skin });
+  }
+
+  function sendHpRespawn(payload) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'hp:respawn', ...payload });
+  }
+
+  function sendPuzzleSync(payload) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'puzzle:sync', ...payload });
+  }
+
+  function sendMonsterSync(payload) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'monster:sync', ...payload });
+  }
+
+  function sendBarrierSync(payload) {
+    if (!activeRoomCode) return;
+    sendPacket({ type: 'barrier:sync', ...payload });
+  }
+
   function sendPhotoSnap(photo) {
     if (!activeRoomCode || !photo) return;
     sendPacket({ type: 'photo:snap', photo });
@@ -468,17 +557,20 @@ export function createCoopClient(callbacks = {}) {
     disconnect,
     getUrl: () => currentUrl,
     getStatus: () => status,
+    getPingMs: () => pingMs,
     getClientId: () => clientId,
     isConnected: () => status === 'connected',
     listRooms,
     createRoom,
     joinRoom,
+    quickJoin,
     leaveRoom,
     setRoomMode,
     sendPlayerState,
     sendStorySync,
     sendOpenWorldAction,
     sendSkinUpdate,
+    sendCustomSkinSave,
     sendChat,
     sendEmote,
     sendWorldTrigger,
@@ -489,6 +581,10 @@ export function createCoopClient(callbacks = {}) {
     sendDanceRespond,
     sendBossSync,
     sendWeatherSync,
+    sendHpRespawn,
+    sendPuzzleSync,
+    sendMonsterSync,
+    sendBarrierSync,
     sendPhotoSnap,
   };
 }

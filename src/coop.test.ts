@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import http from 'node:http';
 import { WebSocket } from 'ws';
 
 import { MAX_PLAYERS_PER_ROOM, createRoomManager } from './coop-server-core.js';
+import { findFirstOpenRoom } from './coop-rooms-list.js';
 import {
   buildOpenWorldSolidPlatforms,
   craftOpenWorldItem,
@@ -84,7 +88,7 @@ function connectTestClient(url: string): Promise<JsonSocketHelper> {
   });
 }
 
-test('Room manager enforces strict 2-player cap, room search/browse, and character assignment', () => {
+test('Room manager enforces strict 2-player cap, room search/browse, and Minecraft-style persistent empty rooms', () => {
   assert.equal(MAX_PLAYERS_PER_ROOM, 2);
   const manager = createRoomManager();
 
@@ -118,7 +122,7 @@ test('Room manager enforces strict 2-player cap, room search/browse, and charact
   assert.equal(third.ok, false);
   assert.equal(third.error, 'ROOM_FULL');
 
-  // Leaving reassigns host & removes room once empty
+  // Leaving reassigns host and NEVER deletes persistent world once empty
   const left1 = manager.leaveRoom('c1');
   assert.equal(left1.left, true);
   assert.equal(left1.roomDeleted, false);
@@ -126,8 +130,72 @@ test('Room manager enforces strict 2-player cap, room search/browse, and charact
 
   const left2 = manager.leaveRoom('c2');
   assert.equal(left2.left, true);
-  assert.equal(left2.roomDeleted, true);
-  assert.equal(manager.listRooms('').length, 0);
+  assert.equal(left2.roomDeleted, false);
+  const listedAfterEmpty = manager.listRooms('');
+  assert.equal(listedAfterEmpty.length, 1);
+  assert.equal(listedAfterEmpty[0].playerCount, 0);
+
+  // Player can rejoin the saved empty room seamlessly
+  const rejoined = manager.joinRoom('c4', 'ND-LOVE');
+  assert.equal(rejoined.ok, true);
+  assert.equal(rejoined.room?.levelIndex, 3);
+});
+
+test('Persistent rooms survive disk reload with mode, levelIndex, playerStates, and storyProgress intact', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nadine-coop-persist-'));
+  const storagePath = path.join(tmpDir, 'coop-rooms.json');
+
+  try {
+    const mgr1 = createRoomManager({ storagePath });
+    const created = mgr1.createRoom('c1', {
+      name: 'Lantern Harbor Save',
+      mode: 'story',
+      levelIndex: 11,
+      character: 'madjid',
+      customCode: 'ND-SAVE',
+    });
+    assert.equal(created.ok, true);
+
+    mgr1.updatePlayerRuntimeState('c1', {
+      x: 842,
+      y: 412,
+      facing: -1,
+      weapons: ['crystal_sword', 'star_wand'],
+      equippedWeapon: 'star_wand',
+    });
+    mgr1.updateStoryProgress('c1', {
+      levelIndex: 11,
+      activeCheckpointId: 'cp_w3_2',
+      collectedKeys: ['k_w3_1'],
+      collectedWeapons: ['wp_1'],
+      brokenBarriers: ['fb_1'],
+      switches: { sw_1: { toggled: true, pressed: true } },
+      gates: { g_1: true },
+    });
+    mgr1.appendChatMessage('c1', { id: 'persist-chat-1', text: 'Saved progress!', timestamp: Date.now() });
+    mgr1.leaveRoom('c1');
+    mgr1.flushSaveSync();
+
+    // Reload from disk in fresh manager instance
+    const mgr2 = createRoomManager({ storagePath });
+    const rooms = mgr2.listRooms('');
+    assert.equal(rooms.length, 1);
+    assert.equal(rooms[0].code, 'ND-SAVE');
+    assert.equal(rooms[0].playerCount, 0);
+    assert.equal(rooms[0].levelIndex, 11);
+
+    const rejoin = mgr2.joinRoom('c9', 'ND-SAVE');
+    assert.equal(rejoin.ok, true);
+    assert.equal(rejoin.room?.levelIndex, 11);
+    assert.equal(rejoin.room?.storyProgress?.activeCheckpointId, 'cp_w3_2');
+    assert.deepEqual(rejoin.room?.storyProgress?.collectedWeapons, ['wp_1']);
+    assert.deepEqual(rejoin.room?.storyProgress?.brokenBarriers, ['fb_1']);
+    assert.equal(rejoin.room?.playerStates?.madjid?.x, 842);
+    assert.equal(rejoin.room?.playerStates?.madjid?.equippedWeapon, 'star_wand');
+    assert.equal(rejoin.room?.chat?.length, 1);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('2D Open-World block placement, removal, solid collisions, and crafting recipes', () => {
@@ -172,8 +240,11 @@ test('Cloud WebSocket URL normalization supports ws://, wss://, http://, and htt
 });
 
 test('Live WebSocket Co-op Server syncs 2 players across Story, Open-World blocks/crafting, and Chat while blocking 3rd player', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nadine-ws-test-'));
   const httpServer = http.createServer();
-  const coop = attachCoopWebSocket(httpServer);
+  const coop = attachCoopWebSocket(httpServer, {
+    storagePath: path.join(tmpDir, 'ws-rooms.json'),
+  });
 
   await new Promise<void>((resolve) => {
     httpServer.listen(0, '127.0.0.1', () => resolve());
@@ -316,5 +387,65 @@ test('Live WebSocket Co-op Server syncs 2 players across Story, Open-World block
     await Promise.all([madjid.close(), nadine.close(), third.close()]);
     await coop.close();
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('Quick Join selects the first available open room via manager and live WebSocket, rejecting NO_OPEN_ROOMS when full', async () => {
+  const manager = createRoomManager();
+  assert.equal(findFirstOpenRoom([]), null);
+  assert.equal(manager.quickJoinRoom('c0').error, 'NO_OPEN_ROOMS');
+
+  manager.createRoom('a1', { name: 'Full Room', customCode: 'ND-FULL' });
+  manager.joinRoom('a2', 'ND-FULL');
+  manager.createRoom('b1', { name: 'Open Meadow', customCode: 'ND-OPEN' });
+
+  const picked = findFirstOpenRoom(manager.listRooms('')) as { code?: string } | null;
+  assert.equal(picked?.code, 'ND-OPEN');
+
+  const qj = manager.quickJoinRoom('b2');
+  assert.equal(qj.ok, true);
+  assert.equal(qj.room?.code, 'ND-OPEN');
+  assert.equal(qj.character, 'nadine');
+  assert.equal(manager.quickJoinRoom('c9').error, 'NO_OPEN_ROOMS');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nadine-ws-quick-'));
+  const httpServer = http.createServer();
+  const coop = attachCoopWebSocket(httpServer, {
+    storagePath: path.join(tmpDir, 'ws-quick-rooms.json'),
+  });
+  await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', () => resolve()));
+  const addr = httpServer.address();
+  assert.ok(addr && typeof addr !== 'string');
+  const wsUrl = `ws://127.0.0.1:${addr.port}/ws`;
+
+  const host = await connectTestClient(wsUrl);
+  const joiner = await connectTestClient(wsUrl);
+  const extra = await connectTestClient(wsUrl);
+
+  try {
+    await host.waitFor((m) => m.type === 'welcome');
+    await joiner.waitFor((m) => m.type === 'welcome');
+    await extra.waitFor((m) => m.type === 'welcome');
+
+    host.send({ type: 'room:create', name: 'Quick Join Harbor', mode: 'story', levelIndex: 0, character: 'madjid' });
+    const hostJoined = await host.waitFor((m) => m.type === 'room:joined');
+    const roomCode = (hostJoined.room as { code: string }).code;
+
+    joiner.send({ type: 'room:quick_join' });
+    const joinerJoined = await joiner.waitFor((m) => m.type === 'room:joined');
+    assert.equal((joinerJoined.room as { code: string }).code, roomCode);
+    assert.equal(joinerJoined.character, 'nadine');
+    await host.waitFor((m) => m.type === 'partner:joined');
+
+    extra.send({ type: 'room:quick_join' });
+    const noOpen = await extra.waitFor((m) => m.type === 'error');
+    assert.equal(noOpen.code, 'NO_OPEN_ROOMS');
+  } finally {
+    await Promise.all([host.close(), joiner.close(), extra.close()]);
+    await coop.close();
+    await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+

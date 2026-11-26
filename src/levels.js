@@ -1,10 +1,15 @@
 /**
  * src/levels.js
- * Modular 10-World / 50-Level Cooperative Campaign & Expandable Pack Registry
+ * Seamless 5-World Cooperative Campaign & Expandable Pack Registry
  * for "Around the World with Nadine".
  *
- * Future level packs can be appended cleanly at runtime via registerWorldPack()
- * without modifying physics, rendering, skins, audio, or background code.
+ * Rules:
+ * - 5 seamless, continuous Worlds (Jungle, Ice Lands, Volcano, Space, Ocean World)
+ * - ZERO intermediate sub-level gates/portals between sections
+ * - Every gate and fragile barrier is sealed overhead to prevent jumping/flying/swimming bypasses
+ * - Mandatory partner cooperation in EVERY world (hold+latch relays, dual sync plates, carry relics,
+ *   tool-gated barriers, Teamwork-Shielded World Bosses in W2..W5, and Dual Exit Door completion)
+ * - Extreme World 2 difficulty spike (>3 min progression) + strict difficulty escalation W2 -> W3 -> W4 -> W5
  */
 
 export const STORY_PREMISE =
@@ -13,1456 +18,2514 @@ export const STORY_PREMISE =
 export const WORLDS = [
   {
     id: 1,
-    name: 'Quiet Village Outskirts',
-    subtitle: 'Where a promise begins at dawn',
-    theme: 'sunrise',
-    landmark: 'cottages',
+    slug: 'jungle',
+    name: 'Jungle',
+    subtitle: 'Sun-dappled ancient vines, co-op relay locks & temple seals',
+    theme: 'jungle',
+    landmark: 'jungle_ruins',
     ambient: 'petals',
+    physicsMode: 'normal',
+    gravityScale: 1,
+    groundAccelScale: 1,
+    groundFrictionScale: 1,
     enemyKind: 'beetle',
     hazardKind: 'thorns',
-    accentColor: '#76A665',
+    accentColor: '#65C474',
     platformPalette: {
-      top: '#76A665',
-      topRim: '#9FD184',
-      body: '#463E54',
-      trim: '#2A2438',
+      top: '#56A654',
+      topRim: '#8BE07B',
+      body: '#3A4A3A',
+      trim: '#1B281E',
     },
-    stageThemes: ['sunrise', 'sunrise', 'sunrise', 'sunrise', 'sunrise'],
   },
   {
     id: 2,
-    name: 'Golden Meadows',
-    subtitle: 'Turning windmills and sunlit valleys',
-    theme: 'sunrise',
-    landmark: 'windmills',
-    ambient: 'dandelions',
-    enemyKind: 'beetle',
-    hazardKind: 'thorns',
-    accentColor: '#98C462',
+    slug: 'ice',
+    name: 'Ice Lands',
+    subtitle: 'Extreme mirror-ice chasms, twin rune weights & frozen gauntlet',
+    theme: 'ice',
+    landmark: 'glaciers',
+    ambient: 'snow',
+    physicsMode: 'ice',
+    gravityScale: 1,
+    groundAccelScale: 0.30,
+    groundFrictionScale: 0.11,
+    enemyKind: 'crab',
+    hazardKind: 'spikes',
+    accentColor: '#7CC6EB',
     platformPalette: {
-      top: '#86B65C',
-      topRim: '#B5DF80',
-      body: '#4C4157',
-      trim: '#2B2336',
+      top: '#7CC6EB',
+      topRim: '#CFF2FF',
+      body: '#2A4E70',
+      trim: '#152B42',
     },
-    stageThemes: ['sunrise', 'sunrise', 'sunrise', 'sunrise', 'sunset'],
   },
   {
     id: 3,
-    name: 'Lantern Harbor',
-    subtitle: 'Glowing piers and gentle sea breezes',
-    theme: 'sunset',
-    landmark: 'lighthouse',
-    ambient: 'fireflies',
-    enemyKind: 'crab',
-    hazardKind: 'spikes',
-    accentColor: '#E59A62',
+    slug: 'volcano',
+    name: 'Volcano',
+    subtitle: 'Obsidian islands, thermal updrafts & surging magma chambers',
+    theme: 'volcano',
+    landmark: 'calderas',
+    ambient: 'embers',
+    physicsMode: 'volcano',
+    gravityScale: 1,
+    groundAccelScale: 1,
+    groundFrictionScale: 1,
+    enemyKind: 'beetle',
+    hazardKind: 'lava',
+    accentColor: '#FF7844',
     platformPalette: {
-      top: '#C98456',
-      topRim: '#ECA978',
-      body: '#362D4C',
-      trim: '#1E182E',
+      top: '#783B35',
+      topRim: '#FF7844',
+      body: '#281C22',
+      trim: '#120A0E',
     },
-    stageThemes: ['sunset', 'sunset', 'sunset', 'sunset', 'night'],
   },
   {
     id: 4,
-    name: 'Sunset Cliffs',
-    subtitle: 'Ancient stone arches above warm canyons',
-    theme: 'sunset',
-    landmark: 'aqueduct',
-    ambient: 'dandelions',
-    enemyKind: 'beetle',
-    hazardKind: 'spikes',
-    accentColor: '#E68364',
+    slug: 'space',
+    name: 'Space',
+    subtitle: 'Zero-G orbital spacewalks, synchronized airlocks & laser gauntlets',
+    theme: 'space',
+    landmark: 'space_station',
+    ambient: 'stars',
+    physicsMode: 'space_swim',
+    gravityScale: 0.02,
+    groundAccelScale: 0.96,
+    groundFrictionScale: 0.88,
+    enemyKind: 'wisp',
+    hazardKind: 'crystals',
+    accentColor: '#60E8FF',
     platformPalette: {
-      top: '#D47E5B',
-      topRim: '#F2A987',
-      body: '#402C49',
-      trim: '#24172D',
+      top: '#3C6E91',
+      topRim: '#78DCFA',
+      body: '#1B2540',
+      trim: '#0D1426',
     },
-    stageThemes: ['sunset', 'sunset', 'sunset', 'sunset', 'night'],
   },
   {
     id: 5,
-    name: 'Starry Desert',
-    subtitle: 'Crescent moon over quiet golden dunes',
-    theme: 'night',
-    landmark: 'dunes',
-    ambient: 'fireflies',
-    enemyKind: 'beetle',
-    hazardKind: 'thorns',
-    accentColor: '#DFC287',
-    platformPalette: {
-      top: '#B8985D',
-      topRim: '#E2C58A',
-      body: '#22294A',
-      trim: '#131830',
-    },
-    stageThemes: ['night', 'night', 'night', 'night', 'night'],
-  },
-  {
-    id: 6,
-    name: 'Misty Highlands',
-    subtitle: 'Crisp pine ridges greeting the morning',
-    theme: 'sunrise',
-    landmark: 'peaks',
-    ambient: 'petals',
-    enemyKind: 'wisp',
-    hazardKind: 'spikes',
-    accentColor: '#6EA884',
-    platformPalette: {
-      top: '#639A78',
-      topRim: '#8FC4A2',
-      body: '#3B415A',
-      trim: '#212538',
-    },
-    stageThemes: ['sunrise', 'sunrise', 'sunrise', 'sunrise', 'sunset'],
-  },
-  {
-    id: 7,
-    name: 'Cloud Bridges',
-    subtitle: 'Floating pavilions painted by dusk',
-    theme: 'sunset',
-    landmark: 'pagodas',
-    ambient: 'petals',
-    enemyKind: 'wisp',
-    hazardKind: 'crystals',
-    accentColor: '#E79CAE',
-    platformPalette: {
-      top: '#D48697',
-      topRim: '#F6B8C6',
-      body: '#393054',
-      trim: '#201A34',
-    },
-    stageThemes: ['sunset', 'sunset', 'sunset', 'sunset', 'night'],
-  },
-  {
-    id: 8,
-    name: 'Crystal Caverns',
-    subtitle: 'Luminous geodes humming in calm night',
-    theme: 'night',
-    landmark: 'crystals',
-    ambient: 'fireflies',
-    enemyKind: 'wisp',
-    hazardKind: 'crystals',
-    accentColor: '#69B8BF',
-    platformPalette: {
-      top: '#4A8E96',
-      topRim: '#7CC4CB',
-      body: '#1D2742',
-      trim: '#10172A',
-    },
-    stageThemes: ['night', 'night', 'night', 'night', 'night'],
-  },
-  {
-    id: 9,
-    name: 'Moonlit Gardens',
-    subtitle: 'Fragrant gazebos lit by warm fireflies',
-    theme: 'night',
-    landmark: 'gazebos',
-    ambient: 'fireflies',
+    slug: 'ocean',
+    name: 'Ocean World',
+    subtitle: 'Abyssal currents, tide locks & the Grand Wedding Arch',
+    theme: 'ocean',
+    landmark: 'coral_temple',
+    ambient: 'bubbles',
+    physicsMode: 'underwater',
+    gravityScale: 0.05,
+    groundAccelScale: 0.9,
+    groundFrictionScale: 0.6,
     enemyKind: 'crab',
     hazardKind: 'thorns',
-    accentColor: '#6EB5A2',
+    accentColor: '#5EEAD4',
     platformPalette: {
-      top: '#4D8A7B',
-      topRim: '#7FBBA9',
-      body: '#232A48',
-      trim: '#13182E',
+      top: '#26948A',
+      topRim: '#6EE7D4',
+      body: '#153447',
+      trim: '#0A1E2B',
     },
-    stageThemes: ['night', 'night', 'night', 'night', 'sunrise'],
-  },
-  {
-    id: 10,
-    name: 'Horizon Summit',
-    subtitle: 'The final ascent to their wedding chapel',
-    theme: 'sunrise',
-    landmark: 'chapel',
-    ambient: 'petals',
-    enemyKind: 'wisp',
-    hazardKind: 'crystals',
-    accentColor: '#F2C97D',
-    platformPalette: {
-      top: '#D4B272',
-      topRim: '#F7DDA6',
-      body: '#3C3559',
-      trim: '#221D36',
-    },
-    stageThemes: ['night', 'sunset', 'sunrise', 'sunrise', 'sunrise'],
   },
 ];
 
-// 50 unique stage titles & romantic story captions (10 Worlds x 5 Stages)
-const STAGE_STORY_CATALOG = [
-  // World 1: Quiet Village Outskirts
-  [
-    {
-      title: 'Dawn Over the Quiet Village',
-      caption:
-        'Stepping past the village fence at first light, Madjid and Nadine hold switches together to unlock the road ahead.',
-    },
-    {
-      title: 'Brookstone Ferry',
-      caption:
-        'A timber ferry spans the sleepy village creek—one sends it across while the other latches it for both.',
-    },
-    {
-      title: 'Briar Hedge Gatehouse',
-      caption:
-        'Wild thorns line the orchard wall, so they split between the sunlit trellis and cobblestone lane.',
-    },
-    {
-      title: 'Twin Bell Meadow',
-      caption:
-        'The old parish seal only opens when two travelers stand upon its stones in harmony.',
-    },
-    {
-      title: 'Farewell Lantern Ridge',
-      caption:
-        'Looking back at their cozy roofs one last time, Madjid takes Nadine’s hand and steps into the wider world.',
-    },
-  ],
-  // World 2: Golden Meadows
-  [
-    {
-      title: 'Sunlit Windmill Lane',
-      caption:
-        'Golden wheat sways beside turning sails as dandelion fluff drifts softly across their path.',
-    },
-    {
-      title: 'Hayloft Sky Ferry',
-      caption:
-        'Between tall stone silos, a gentle pulley bridge glides smoothly over the clover gorge.',
-    },
-    {
-      title: 'Clover Archway Vault',
-      caption:
-        'Nadine spots a brass key sparkling above the upper beams while Madjid guards the meadow latch.',
-    },
-    {
-      title: 'Millstone Harmony',
-      caption:
-        'Two ancient weight plates chime together, raising the mossy barrier to the sunlit hill.',
-    },
-    {
-      title: 'Amber Harvest Crossing',
-      caption:
-        'As afternoon melts into warm dusk, the windmills wave goodbye from the rim of the valley.',
-    },
-  ],
-  // World 3: Lantern Harbor
-  [
-    {
-      title: 'Lighthouse Promenade',
-      caption:
-        'Salt air and amber pier lanterns welcome them to the seaside docks where ships prepare to sail.',
-    },
-    {
-      title: 'Tidewater Gondola',
-      caption:
-        'A swaying harbor raft carries them above the evening tide while tiny shore crabs scuttle along the planks.',
-    },
-    {
-      title: 'Boardwalk Belltower',
-      caption:
-        'Climbing the rigging ledges together, they unlock the harbor master’s dual-key boathouse.',
-    },
-    {
-      title: 'Anchor Seal Pier',
-      caption:
-        'Both sea-stone switches click down in unison, hoisting the weathered timber floodgate.',
-    },
-    {
-      title: 'Starlit Breakwater',
-      caption:
-        'Under the first stars over the bay, warm lanterns guide Madjid and Nadine toward the coastal cliffs.',
-    },
-  ],
-  // World 4: Sunset Cliffs
-  [
-    {
-      title: 'Terracotta Overlook',
-      caption:
-        'High above the sea, painted sandstone ledges glow rose-gold in the lingering afternoon sun.',
-    },
-    {
-      title: 'Viaduct Canyon Span',
-      caption:
-        'An aqueduct cable car glides gracefully between carved red-stone pillars.',
-    },
-    {
-      title: 'Canyon Archway Gallery',
-      caption:
-        'Upper colonnades and lower pathways weave together beneath the sweeping cliffside bridge.',
-    },
-    {
-      title: 'Twin Pillar Covenant',
-      caption:
-        'Standing across the sunlit chasm, they weigh down the twin seals to open the mountain gate.',
-    },
-    {
-      title: 'Twilight Aqueduct Summit',
-      caption:
-        'The last rays of sunset dip below the arches, revealing a cool starlit trail into the dunes.',
-    },
-  ],
-  // World 5: Starry Desert
-  [
-    {
-      title: 'Crescent Oasis Gate',
-      caption:
-        'Beneath a silver crescent moon, palm shadows and lantern posts shimmer across the peaceful sands.',
-    },
-    {
-      title: 'Dune Wind Skiff',
-      caption:
-        'A silent desert skiff carries them smoothly over the cool midnight valley between sandstone bluffs.',
-    },
-    {
-      title: 'Astronomer’s Balcony',
-      caption:
-        'Guided by fireflies and constellations, they gather twin brass keys from the quiet oasis rooftops.',
-    },
-    {
-      title: 'Mirage Seal Courtyard',
-      caption:
-        'Two starlight plinths answer only to partners standing together in the hush of the desert night.',
-    },
-    {
-      title: 'Caravan of a Thousand Stars',
-      caption:
-        'Crossing the final moonlit minaret, Madjid and Nadine rest beneath the sky and dream of tomorrow.',
-    },
-  ],
-  // World 6: Misty Highlands
-  [
-    {
-      title: 'Pine Ridge Sunrise',
-      caption:
-        'Cool mist lifts off evergreen peaks as golden dawn warms the mossy mountain steps.',
-    },
-    {
-      title: 'Highland Timber Tram',
-      caption:
-        'Playful mountain wisps drift along the cliffs while their rope tram crosses the crisp ravine.',
-    },
-    {
-      title: 'Shepherd’s Dual Trail',
-      caption:
-        'One takes the breezy cliffside path while the other raises the timber lift below.',
-    },
-    {
-      title: 'Cairn of Two Hearts',
-      caption:
-        'Built by travelers long ago, the twin cairn stones part the highland gate when pressed together.',
-    },
-    {
-      title: 'Cloudline Overlook',
-      caption:
-        'At the crest of the pine pass, dusk clouds gather softly right beneath their feet.',
-    },
-  ],
-  // World 7: Cloud Bridges
-  [
-    {
-      title: 'Porcelain Sky Terrace',
-      caption:
-        'Blossom petals drift past floating pagoda eaves suspended in an apricot sunset sky.',
-    },
-    {
-      title: 'Zephyr Pavilion Ferry',
-      caption:
-        'A rosy cloud-skiff glides between ivory islands while shimmering shards guard the edge.',
-    },
-    {
-      title: 'Pagoda Lantern Walk',
-      caption:
-        'Hopping gracefully across tiered eaves, Madjid and Nadine unlock the skyward shrine.',
-    },
-    {
-      title: 'Harmony Bell Bridges',
-      caption:
-        'Two sky chimes ring in unison, parting the rose-gold barrier high above the drifting clouds.',
-    },
-    {
-      title: 'Dusk Over the Sky Isles',
-      caption:
-        'As indigo night settles over the cloud sea, glowing crystals beckon them down to a hidden cavern.',
-    },
-  ],
-  // World 8: Crystal Caverns
-  [
-    {
-      title: 'Geode Lantern Entrance',
-      caption:
-        'Soft teal crystals illuminate serene underground halls filled with quiet echoes and firefly light.',
-    },
-    {
-      title: 'Prismatic Chasm Lift',
-      caption:
-        'A balanced crystal ferry carries them gently across a luminous subterranean pool.',
-    },
-    {
-      title: 'Amethyst Mirror Vault',
-      caption:
-        'Upper crystal ledges glitter overhead while cavern wisps hum peaceful patrols below.',
-    },
-    {
-      title: 'Resonance Gatehouse',
-      caption:
-        'Simultaneous footsteps ring clear through the cavern, unsealing the sapphire vault.',
-    },
-    {
-      title: 'Heart of the Crystal Spring',
-      caption:
-        'Emerging past the final glowing geode, cool night air brings the scent of blooming garden roses.',
-    },
-  ],
-  // World 9: Moonlit Gardens
-  [
-    {
-      title: 'Gazebo of Fireflies',
-      caption:
-        'Warm garden lanterns line manicured moon-jade hedges where fireflies dance between stone arches.',
-    },
-    {
-      title: 'Lilypond Footbridge',
-      caption:
-        'A carved garden ferry glides across the reflective pond while shore beetles stroll the mosaic walk.',
-    },
-    {
-      title: 'Rose Trellis Courtyard',
-      caption:
-        'Climbing fragrant ivy terraces, Madjid and Nadine gather the garden’s twin golden keys.',
-    },
-    {
-      title: 'Lover’s Fountain Seal',
-      caption:
-        'Two moonlit flagstones chime softly together, parting the wrought-iron hedge gate.',
-    },
-    {
-      title: 'Dawn Gate of the Conservatory',
-      caption:
-        'Morning light breaks over the tall cypress trees, revealing the grand summit path ahead.',
-    },
-  ],
-  // World 10: Horizon Summit
-  [
-    {
-      title: 'Starlit Summit Steps',
-      caption:
-        'Beneath the last quiet stars of their journey, every lesson learned side by side guides their steps.',
-    },
-    {
-      title: 'Golden Hour Skyway',
-      caption:
-        'Warm amber clouds swirl around ivory marble piers as the chapel bells echo in the distance.',
-    },
-    {
-      title: 'Chapel Bell Gallery',
-      caption:
-        'Sunrise spills across the upper arches while Madjid and Nadine unlock the sunlit sanctuary.',
-    },
-    {
-      title: 'Vow of the Twin Pillars',
-      caption:
-        'One last twin-seal gate parts effortlessly as they stand together in perfect rhythm.',
-    },
-    {
-      title: 'The Wedding Horizon',
-      caption:
-        'After fifty unforgettable horizons around the world, Madjid and Nadine step hand in hand beneath their wedding arch.',
-    },
-  ],
-];
-
-const SWITCH_COLORS = ['#F59E0B', '#38BDF8', '#F472B6', '#34D399', '#A78BFA'];
-
-function getEnemySpeed(worldIdx, stageIdx) {
-  return Math.round(54 + worldIdx * 6.5 + stageIdx * 3.5);
-}
-
-/**
- * Blueprint 1 (Stage 1 of each world): Gatehouse, Lift & Meadow Approach.
- * World 1 Stage 1 has zero hazards/enemies for a gentle, welcoming opening.
- */
-function buildStage1(world, worldIdx, meta) {
-  const id = worldIdx * 5 + 1;
-  const worldWidth = 1280 + Math.min(220, worldIdx * 24);
-  const theme = world.stageThemes[0];
-  const liftColor = SWITCH_COLORS[worldIdx % SWITCH_COLORS.length];
-  const altColor = SWITCH_COLORS[(worldIdx + 1) % SWITCH_COLORS.length];
-  const hasCanyonGap = worldIdx >= 2;
-  const isTutorial = worldIdx === 0;
-  const swAId = isTutorial ? 'sw_1a' : `sw_${id}_a`;
-  const swBId = isTutorial ? 'sw_1b' : `sw_${id}_b`;
-  const gateId = isTutorial ? 'gate_1' : `gate_${id}`;
-  const liftId = isTutorial ? 'lift_1' : `lift_${id}`;
-
-  const platforms = [];
-  if (hasCanyonGap) {
-    platforms.push({ x: 0, y: 600, w: 300, h: 120, kind: 'ground' });
-    platforms.push({ x: 404, y: 600, w: 256, h: 120, kind: 'ground' });
-  } else {
-    platforms.push({ x: 0, y: 600, w: 660, h: 120, kind: 'ground' });
-  }
-  platforms.push({ x: 660, y: 600, w: worldWidth - 660, h: 120, kind: 'ground' });
-  platforms.push({ x: 642, y: 396, w: 56, h: 86, kind: 'archway' });
-  platforms.push({ x: 736, y: 432, w: 244, h: 24, kind: 'ledge' });
-  if (worldIdx >= 4) {
-    platforms.push({ x: 205, y: 516, w: 120, h: 24, kind: 'ledge' });
-  }
-
-  const switches = [
-    {
-      id: swAId,
-      x: hasCanyonGap ? 430 : 244,
-      y: 600,
-      w: 48,
-      mode: 'hold',
-      color: liftColor,
-      label: 'A',
-    },
-    {
-      id: swBId,
-      x: 724,
-      y: 600,
-      w: 48,
-      mode: worldIdx >= 3 ? 'toggle' : 'hold',
-      color: altColor,
-      label: 'B',
-    },
-  ];
-
-  const movingPlatforms = [
-    {
-      id: liftId,
-      startX: 500,
-      startY: 576,
-      endX: 500,
-      endY: 432,
-      w: 112,
-      h: 22,
-      speed: 140 + worldIdx * 4,
-      switches: [swAId],
-      requireAll: false,
-      color: liftColor,
-    },
-  ];
-
-  const gates = [
-    {
-      id: gateId,
-      x: 656,
-      y: 482,
-      w: 28,
-      h: 118,
-      openOffsetX: 0,
-      openOffsetY: -118,
-      speed: 220,
-      switches: [swAId, swBId],
-      requireAll: false,
-      latchOnOpen: false,
-      color: liftColor,
-    },
-  ];
-
-  const keys = [
-    {
-      id: `key_${id}_1`,
-      x: 856,
-      y: 390,
-      color: '#FBBF24',
-    },
-  ];
-
-  const checkpoints = [
-    {
-      id: `cp_${id}_1`,
-      x: 822,
-      y: 600,
-    },
-  ];
-
-  const hazards = [];
-  if (worldIdx >= 1) {
-    hazards.push({
-      id: `hz_${id}_1`,
-      x: 924,
-      y: 586,
-      w: 44,
-      h: 14,
-      kind: world.hazardKind,
-    });
-  }
-
-  const enemies = [];
-  if (worldIdx >= 2) {
-    const enemyMaxX = Math.min(worldWidth - 196, 1180);
-    if (enemyMaxX - 1004 >= 72) {
-      enemies.push({
-        id: `en_${id}_1`,
-        x: 1030,
-        y: 576,
-        w: 30,
-        h: 24,
-        minX: 1004,
-        maxX: enemyMaxX,
-        speed: getEnemySpeed(worldIdx, 0),
-        kind: world.enemyKind,
-      });
-    }
-  }
-
+function buildJungleWorld(world) {
+  const worldWidth = 4400;
   return {
-    id,
-    worldId: world.id,
+    id: 1,
+    worldId: 1,
     stageInWorld: 1,
-    code: `${world.id}-1`,
-    chapterLabel: `World ${world.id} · Stage 1`,
-    shortCode: `W${world.id}-1`,
+    code: '1',
+    chapterLabel: 'World 1 · Jungle',
+    shortCode: 'W1',
     worldName: world.name,
-    title: meta.title,
-    caption: meta.caption,
-    theme,
+    title: 'Canopy of Forgotten Seals',
+    caption:
+      'Stepping beyond their quiet village, Madjid and Nadine enter an overgrown jungle temple where co-op relay gates, thick vines, and stone glyphs demand teamwork.',
+    theme: world.theme,
     landmark: world.landmark,
-    ambient: theme === 'night' ? 'fireflies' : world.ambient,
+    ambient: world.ambient,
+    physicsMode: world.physicsMode,
+    gravityScale: world.gravityScale,
+    groundAccelScale: world.groundAccelScale,
+    groundFrictionScale: world.groundFrictionScale,
     worldWidth,
     worldHeight: 720,
-    spawns: {
-      madjid: { x: 86, y: 564 },
-      nadine: { x: 136, y: 564 },
-    },
-    platforms,
-    switches,
-    movingPlatforms,
-    gates,
-    keys,
-    checkpoints,
-    hazards,
-    enemies,
-    exit: {
-      x: worldWidth - 134,
-      y: 504,
-      w: 80,
-      h: 96,
-      keysRequired: keys.length,
-    },
-    decorations: [
-      { type: 'signpost', x: 54, y: 600 },
-      { type: 'flowers', x: 196, y: 600 },
-      { type: 'lantern', x: 616, y: 600 },
-      { type: 'lantern', x: worldWidth - 168, y: 600 },
+    sectors: [
+      { code: '1.1', name: 'Village Outskirts & Vine Gate', startX: 0 },
+      { code: '1.2', name: 'Canopy Vine Labyrinth', startX: 1120 },
+      { code: '1.3', name: 'Sun-Seal Sanctuary & Guardian', startX: 2440 },
     ],
-  };
-}
-
-/**
- * Blueprint 2 (Stage 2 of each world): Horizontal Ferry Relay & Elevated Island.
- */
-function buildStage2(world, worldIdx, meta) {
-  const id = worldIdx * 5 + 2;
-  const worldWidth = 1520 + Math.min(180, worldIdx * 20);
-  const theme = world.stageThemes[1];
-  const ferryColor = SWITCH_COLORS[(worldIdx + 1) % SWITCH_COLORS.length];
-  const latchColor = SWITCH_COLORS[(worldIdx + 2) % SWITCH_COLORS.length];
-  const hasSecondKey = worldIdx >= 3;
-
-  const platforms = [
-    { x: 0, y: 600, w: 380, h: 120, kind: 'ground' },
-    { x: 810, y: 600, w: 290, h: 120, kind: 'ground' },
-    { x: 1186, y: 564, w: worldWidth - 1186, h: 156, kind: 'ground' },
-    { x: 740, y: 518, w: 110, h: 24, kind: 'ledge' },
-    { x: 906, y: 452, w: 164, h: 24, kind: 'ledge' },
-  ];
-
-  if (hasSecondKey) {
-    platforms.push({ x: 1106, y: 472, w: 88, h: 22, kind: 'ledge' });
-    platforms.push({ x: 1236, y: 446, w: 146, h: 24, kind: 'ledge' });
-  }
-
-  const switches = [
-    {
-      id: `sw_${id}_a`,
-      x: 274,
-      y: 600,
-      w: 48,
-      mode: 'hold',
-      color: ferryColor,
-      label: 'A',
-    },
-    {
-      id: `sw_${id}_b`,
-      x: 840,
-      y: 600,
-      w: 48,
-      mode: 'toggle',
-      color: latchColor,
-      label: 'B',
-    },
-  ];
-
-  const movingPlatforms = [
-    {
-      id: `ferry_${id}`,
-      startX: 404,
-      startY: 572,
-      endX: 668,
-      endY: 572,
-      w: 118,
-      h: 22,
-      speed: 148 + worldIdx * 5,
-      switches: [`sw_${id}_a`],
-      patrolSwitches: [`sw_${id}_b`],
-      requireAll: false,
-      color: ferryColor,
-    },
-  ];
-
-  const keys = [
-    {
-      id: `key_${id}_1`,
-      x: 988,
-      y: 412,
-      color: '#FBBF24',
-    },
-  ];
-  if (hasSecondKey) {
-    keys.push({
-      id: `key_${id}_2`,
-      x: 1308,
-      y: 406,
-      color: '#F472B6',
-    });
-  }
-
-  const checkpoints = [
-    {
-      id: `cp_${id}_1`,
-      x: 942,
-      y: 600,
-    },
-  ];
-
-  const hazards = [
-    {
-      id: `hz_${id}_1`,
-      x: 1030,
-      y: 586,
-      w: 42,
-      h: 14,
-      kind: world.hazardKind,
-    },
-  ];
-
-  const enemies = [];
-  if (worldIdx >= 1) {
-    enemies.push({
-      id: `en_${id}_1`,
-      x: 1240,
-      y: 540,
-      w: 30,
-      h: 24,
-      minX: 1218,
-      maxX: worldWidth - 178,
-      speed: getEnemySpeed(worldIdx, 1),
-      kind: world.enemyKind,
-    });
-  }
-
-  return {
-    id,
-    worldId: world.id,
-    stageInWorld: 2,
-    code: `${world.id}-2`,
-    chapterLabel: `World ${world.id} · Stage 2`,
-    shortCode: `W${world.id}-2`,
-    worldName: world.name,
-    title: meta.title,
-    caption: meta.caption,
-    theme,
-    landmark: world.landmark,
-    ambient: theme === 'night' ? 'fireflies' : world.ambient,
-    worldWidth,
-    worldHeight: 720,
-    spawns: {
-      madjid: { x: 76, y: 564 },
-      nadine: { x: 126, y: 564 },
-    },
-    platforms,
-    switches,
-    movingPlatforms,
-    gates: [],
-    keys,
-    checkpoints,
-    hazards,
-    enemies,
-    exit: {
-      x: worldWidth - 124,
-      y: 468,
-      w: 80,
-      h: 96,
-      keysRequired: keys.length,
-    },
-    decorations: [
-      { type: 'lantern', x: 348, y: 600 },
-      { type: 'flowers', x: 196, y: 600 },
-      { type: 'lantern', x: 824, y: 600 },
-      { type: 'lantern', x: worldWidth - 156, y: 564 },
-    ],
-  };
-}
-
-/**
- * Blueprint 3 (Stage 3 of each world): Split Upper/Lower Archway & Lift Vault.
- */
-function buildStage3(world, worldIdx, meta) {
-  const id = worldIdx * 5 + 3;
-  const worldWidth = 1540 + Math.min(200, worldIdx * 20);
-  const theme = world.stageThemes[2];
-  const gateColor = SWITCH_COLORS[(worldIdx + 2) % SWITCH_COLORS.length];
-  const liftColor = SWITCH_COLORS[(worldIdx + 3) % SWITCH_COLORS.length];
-
-  const platforms = [
-    { x: 0, y: 600, w: 720, h: 120, kind: 'ground' },
-    { x: 720, y: 600, w: worldWidth - 720, h: 120, kind: 'ground' },
-    { x: 190, y: 518, w: 120, h: 24, kind: 'ledge' },
-    { x: 350, y: 438, w: 140, h: 24, kind: 'ledge' },
-    { x: 530, y: 368, w: 220, h: 24, kind: 'ledge' },
-    { x: 690, y: 392, w: 56, h: 90, kind: 'archway' },
-    { x: 830, y: 380, w: 190, h: 24, kind: 'ledge' },
-    { x: 1224, y: 382, w: 174, h: 24, kind: 'ledge' },
-  ];
-
-  const switches = [
-    {
-      id: `sw_${id}_a`,
-      x: 560,
-      y: 368,
-      w: 48,
-      mode: 'toggle',
-      color: gateColor,
-      label: 'A',
-    },
-    {
-      id: `sw_${id}_b`,
-      x: 882,
-      y: 600,
-      w: 48,
-      mode: 'hold',
-      color: liftColor,
-      label: 'B',
-    },
-  ];
-
-  const gates = [
-    {
-      id: `gate_${id}`,
-      x: 704,
-      y: 482,
-      w: 28,
-      h: 118,
-      openOffsetX: 0,
-      openOffsetY: -118,
-      speed: 230,
-      switches: [`sw_${id}_a`],
-      requireAll: false,
-      latchOnOpen: true,
-      color: gateColor,
-    },
-  ];
-
-  const movingPlatforms = [
-    {
-      id: `lift_${id}`,
-      startX: 1090,
-      startY: 576,
-      endX: 1090,
-      endY: 382,
-      w: 108,
-      h: 22,
-      speed: 148 + worldIdx * 5,
-      switches: [`sw_${id}_b`],
-      requireAll: false,
-      color: liftColor,
-    },
-  ];
-
-  const keys = [
-    {
-      id: `key_${id}_1`,
-      x: 656,
-      y: 326,
-      color: '#FBBF24',
-    },
-    {
-      id: `key_${id}_2`,
-      x: 1312,
-      y: 340,
-      color: '#38BDF8',
-    },
-  ];
-
-  const checkpoints = [
-    {
-      id: `cp_${id}_1`,
-      x: 806,
-      y: 600,
-    },
-  ];
-
-  const hazards = [
-    {
-      id: `hz_${id}_1`,
-      x: 332,
-      y: 586,
-      w: 44,
-      h: 14,
-      kind: world.hazardKind,
-    },
-  ];
-
-  if (worldIdx >= 2) {
-    hazards.push({
-      id: `hz_${id}_2`,
-      x: 996,
-      y: 586,
-      w: 44,
-      h: 14,
-      kind: world.hazardKind,
-    });
-  }
-
-  const enemies = [
-    {
-      id: `en_${id}_1`,
-      x: 1244,
-      y: 576,
-      w: 30,
-      h: 24,
-      minX: 1218,
-      maxX: worldWidth - 180,
-      speed: getEnemySpeed(worldIdx, 2),
-      kind: world.enemyKind,
-    },
-  ];
-
-  if (worldIdx >= 1) {
-    enemies.push({
-      id: `en_${id}_2`,
-      x: 860,
-      y: 356,
-      w: 30,
-      h: 24,
-      minX: 842,
-      maxX: 980,
-      speed: getEnemySpeed(worldIdx, 1),
-      kind: world.enemyKind,
-    });
-  }
-
-  return {
-    id,
-    worldId: world.id,
-    stageInWorld: 3,
-    code: `${world.id}-3`,
-    chapterLabel: `World ${world.id} · Stage 3`,
-    shortCode: `W${world.id}-3`,
-    worldName: world.name,
-    title: meta.title,
-    caption: meta.caption,
-    theme,
-    landmark: world.landmark,
-    ambient: theme === 'night' ? 'fireflies' : world.ambient,
-    worldWidth,
-    worldHeight: 720,
-    spawns: {
-      madjid: { x: 74, y: 564 },
-      nadine: { x: 122, y: 564 },
-    },
-    platforms,
-    switches,
-    movingPlatforms,
-    gates,
-    keys,
-    checkpoints,
-    hazards,
-    enemies,
-    exit: {
-      x: worldWidth - 130,
-      y: 504,
-      w: 80,
-      h: 96,
-      keysRequired: keys.length,
-    },
-    decorations: [
-      { type: 'lantern', x: 164, y: 600 },
-      { type: 'flowers', x: 560, y: 600 },
-      { type: 'lantern', x: 762, y: 600 },
-      { type: 'lantern', x: worldWidth - 166, y: 600 },
-    ],
-  };
-}
-
-/**
- * Blueprint 4 (Stage 4 of each world): Twin-Weight AND Seal Gate + Courtyard Patrol.
- */
-function buildStage4(world, worldIdx, meta) {
-  const id = worldIdx * 5 + 4;
-  const worldWidth = 1680 + Math.min(160, worldIdx * 16);
-  const theme = world.stageThemes[3];
-  const sealColor = SWITCH_COLORS[(worldIdx + 3) % SWITCH_COLORS.length];
-  const liftColor = SWITCH_COLORS[(worldIdx + 4) % SWITCH_COLORS.length];
-  const isLegacyFourth = worldIdx === 0;
-  const swAId = isLegacyFourth ? 'sw_4a' : `sw_${id}_a`;
-  const swBId = isLegacyFourth ? 'sw_4b' : `sw_${id}_b`;
-  const gateId = isLegacyFourth ? 'gate_4a' : `gate_${id}_seal`;
-
-  const platforms = [
-    { x: 0, y: 600, w: 500, h: 120, kind: 'ground' },
-    { x: 595, y: 600, w: 495, h: 120, kind: 'ground' },
-    { x: 1090, y: 600, w: worldWidth - 1090, h: 120, kind: 'ground' },
-    { x: 236, y: 516, w: 158, h: 24, kind: 'ledge' },
-    { x: 426, y: 442, w: 184, h: 24, kind: 'ledge' },
-    { x: 1040, y: 394, w: 56, h: 88, kind: 'archway' },
-    { x: 1416, y: 432, w: 136, h: 24, kind: 'ledge' },
-  ];
-
-  const switches = [
-    {
-      id: swAId,
-      x: 452,
-      y: 442,
-      w: 48,
-      mode: 'hold',
-      color: sealColor,
-      label: '1',
-    },
-    {
-      id: swBId,
-      x: 702,
-      y: 600,
-      w: 48,
-      mode: 'hold',
-      color: sealColor,
-      label: '2',
-    },
-    {
-      id: `sw_${id}_c`,
-      x: 1200,
-      y: 600,
-      w: 48,
-      mode: 'hold',
-      color: liftColor,
-      label: 'L',
-    },
-  ];
-
-  const gates = [
-    {
-      id: gateId,
-      x: 1054,
-      y: 482,
-      w: 28,
-      h: 118,
-      openOffsetX: 0,
-      openOffsetY: -118,
-      speed: 235,
-      switches: [swAId, swBId],
-      requireAll: true,
-      latchOnOpen: true,
-      color: sealColor,
-    },
-  ];
-
-  const movingPlatforms = [
-    {
-      id: `lift_${id}`,
-      startX: 1290,
-      startY: 576,
-      endX: 1290,
-      endY: 432,
-      w: 106,
-      h: 22,
-      speed: 150 + worldIdx * 5,
-      switches: [`sw_${id}_c`],
-      requireAll: false,
-      color: liftColor,
-    },
-  ];
-
-  const keys = [
-    {
-      id: `key_${id}_1`,
-      x: 544,
-      y: 400,
-      color: '#FBBF24',
-    },
-    {
-      id: `key_${id}_2`,
-      x: 1484,
-      y: 390,
-      color: '#F472B6',
-    },
-  ];
-
-  const checkpoints = [
-    {
-      id: `cp_${id}_1`,
-      x: 634,
-      y: 600,
-    },
-  ];
-  if (worldIdx >= 2) {
-    checkpoints.push({
-      id: `cp_${id}_2`,
-      x: 1138,
-      y: 600,
-    });
-  }
-
-  const hazards = [];
-  if (worldIdx >= 1) {
-    hazards.push({
-      id: `hz_${id}_1`,
-      x: 424,
-      y: 586,
-      w: 44,
-      h: 14,
-      kind: world.hazardKind,
-    });
-  }
-  if (worldIdx < 4) {
-    hazards.push({
-      id: `hz_${id}_2`,
-      x: 1424,
-      y: 586,
-      w: 44,
-      h: 14,
-      kind: world.hazardKind,
-    });
-  }
-
-  const enemies = [
-    {
-      id: `en_${id}_1`,
-      x: 820,
-      y: 576,
-      w: 30,
-      h: 24,
-      minX: 794,
-      maxX: 988,
-      speed: getEnemySpeed(worldIdx, 3),
-      kind: world.enemyKind,
-    },
-  ];
-
-  if (worldIdx >= 4) {
-    enemies.push({
-      id: `en_${id}_2`,
-      x: 1440,
-      y: 576,
-      w: 30,
-      h: 24,
-      minX: 1418,
-      maxX: worldWidth - 170,
-      speed: getEnemySpeed(worldIdx, 2),
-      kind: world.enemyKind,
-    });
-  }
-
-  return {
-    id,
-    worldId: world.id,
-    stageInWorld: 4,
-    code: `${world.id}-4`,
-    chapterLabel: `World ${world.id} · Stage 4`,
-    shortCode: `W${world.id}-4`,
-    worldName: world.name,
-    title: meta.title,
-    caption: meta.caption,
-    theme,
-    landmark: world.landmark,
-    ambient: theme === 'night' ? 'fireflies' : world.ambient,
-    worldWidth,
-    worldHeight: 720,
-    spawns: {
-      madjid: { x: 72, y: 564 },
-      nadine: { x: 120, y: 564 },
-    },
-    platforms,
-    switches,
-    movingPlatforms,
-    gates,
-    keys,
-    checkpoints,
-    hazards,
-    enemies,
-    exit: {
-      x: worldWidth - 120,
-      y: 504,
-      w: 80,
-      h: 96,
-      keysRequired: keys.length,
-    },
-    decorations: [
-      { type: 'flowers', x: 196, y: 600 },
-      { type: 'lantern', x: 484, y: 600 },
-      { type: 'lantern', x: 1018, y: 600 },
-      { type: 'lantern', x: worldWidth - 154, y: 600 },
-    ],
-  };
-}
-
-/**
- * Blueprint 5 (Stage 5 of each world): Grand World Finale — Ferry + Twin Seal + 2 Checkpoints.
- * Level 50 (World 10 · Stage 5) culminates at the Wedding Arch!
- */
-function buildStage5(world, worldIdx, meta) {
-  const id = worldIdx * 5 + 5;
-  const worldWidth = Math.min(1880, 1760 + worldIdx * 14);
-  const theme = world.stageThemes[4];
-  const ferryColor = SWITCH_COLORS[worldIdx % SWITCH_COLORS.length];
-  const latchColor = SWITCH_COLORS[(worldIdx + 1) % SWITCH_COLORS.length];
-  const sealColor = SWITCH_COLORS[(worldIdx + 2) % SWITCH_COLORS.length];
-  const hasThirdKey = worldIdx >= 4;
-  const isWeddingFinale = id === 50;
-
-  const platforms = [
-    { x: 0, y: 600, w: 380, h: 120, kind: 'ground' },
-    { x: 750, y: 600, w: 490, h: 120, kind: 'ground' },
-    { x: 1240, y: 600, w: worldWidth - 1240, h: 120, kind: 'ground' },
-    { x: 214, y: 516, w: 112, h: 24, kind: 'ledge' },
-    { x: 370, y: 440, w: 220, h: 24, kind: 'ledge' },
-    { x: 678, y: 490, w: 112, h: 22, kind: 'ledge' },
-    { x: 866, y: 446, w: 244, h: 24, kind: 'ledge' },
-    { x: 1122, y: 516, w: 80, h: 22, kind: 'ledge' },
-    { x: 1212, y: 394, w: 56, h: 88, kind: 'archway' },
-  ];
-
-  if (hasThirdKey) {
-    platforms.push({ x: 1450, y: 516, w: 86, h: 22, kind: 'ledge' });
-    platforms.push({ x: 1554, y: 444, w: 120, h: 24, kind: 'ledge' });
-  }
-
-  const switches = [
-    {
-      id: `sw_${id}_ferry`,
-      x: 274,
-      y: 600,
-      w: 48,
-      mode: 'hold',
-      color: ferryColor,
-      label: 'A',
-    },
-    {
-      id: `sw_${id}_patrol`,
-      x: 780,
-      y: 600,
-      w: 48,
-      mode: 'toggle',
-      color: latchColor,
-      label: 'B',
-    },
-    {
-      id: `sw_${id}_seal_a`,
-      x: 1044,
-      y: 446,
-      w: 48,
-      mode: 'hold',
-      color: sealColor,
-      label: '1',
-    },
-    {
-      id: `sw_${id}_seal_b`,
-      x: 1148,
-      y: 600,
-      w: 48,
-      mode: 'hold',
-      color: sealColor,
-      label: '2',
-    },
-  ];
-
-  const movingPlatforms = [
-    {
-      id: `ferry_${id}`,
-      startX: 400,
-      startY: 572,
-      endX: 618,
-      endY: 572,
-      w: 112,
-      h: 22,
-      speed: 152 + worldIdx * 5,
-      switches: [`sw_${id}_ferry`],
-      patrolSwitches: [`sw_${id}_patrol`],
-      requireAll: false,
-      color: ferryColor,
-    },
-  ];
-
-  const gates = [
-    {
-      id: `gate_${id}_seal`,
-      x: 1226,
-      y: 482,
-      w: 28,
-      h: 118,
-      openOffsetX: 0,
-      openOffsetY: -118,
-      speed: 240,
-      switches: [`sw_${id}_seal_a`, `sw_${id}_seal_b`],
-      requireAll: true,
-      latchOnOpen: true,
-      color: sealColor,
-    },
-  ];
-
-  const keys = [
-    {
-      id: `key_${id}_1`,
-      x: 480,
-      y: 398,
-      color: '#FBBF24',
-    },
-    {
-      id: `key_${id}_2`,
-      x: 960,
-      y: 404,
-      color: '#F472B6',
-    },
-  ];
-  if (hasThirdKey) {
-    keys.push({
-      id: `key_${id}_3`,
-      x: 1614,
-      y: 402,
-      color: '#38BDF8',
-    });
-  }
-
-  const checkpoints = [
-    {
-      id: `cp_${id}_1`,
-      x: 862,
-      y: 600,
-    },
-    {
-      id: `cp_${id}_2`,
-      x: 1296,
-      y: 600,
-    },
-  ];
-
-  const hazards = [
-    {
-      id: `hz_${id}_1`,
-      x: 1378,
-      y: 586,
-      w: 44,
-      h: 14,
-      kind: world.hazardKind,
-    },
-  ];
-
-  const enemies = [
-    {
-      id: `en_${id}_1`,
-      x: 960,
-      y: 576,
-      w: 30,
-      h: 24,
-      minX: 924,
-      maxX: 1102,
-      speed: getEnemySpeed(worldIdx, 3),
-      kind: world.enemyKind,
-    },
-  ];
-
-  const enemy2MinX = hasThirdKey ? 1548 : 1468;
-  const enemy2MaxX = worldWidth - 170;
-  if (worldIdx >= 1 && enemy2MaxX - enemy2MinX >= 72) {
-    enemies.push({
-      id: `en_${id}_2`,
-      x: enemy2MinX + 20,
-      y: 576,
-      w: 30,
-      h: 24,
-      minX: enemy2MinX,
-      maxX: enemy2MaxX,
-      speed: getEnemySpeed(worldIdx, 4),
-      kind: world.enemyKind,
-    });
-  }
-
-  return {
-    id,
-    worldId: world.id,
-    stageInWorld: 5,
-    code: `${world.id}-5`,
-    chapterLabel: `World ${world.id} · Stage 5`,
-    shortCode: `W${world.id}-5`,
-    worldName: world.name,
-    title: meta.title,
-    caption: meta.caption,
-    theme,
-    landmark: world.landmark,
-    ambient: theme === 'night' ? 'fireflies' : world.ambient,
-    worldWidth,
-    worldHeight: 720,
     spawns: {
       madjid: { x: 70, y: 564 },
       nadine: { x: 118, y: 564 },
     },
-    platforms,
-    switches,
-    movingPlatforms,
-    gates,
-    keys,
-    checkpoints,
-    hazards,
-    enemies,
-    exit: {
-      x: worldWidth - 122,
-      y: 504,
-      w: 80,
-      h: 96,
-      keysRequired: keys.length,
-      isWeddingArch: isWeddingFinale,
+    platforms: [
+      { id: 'w1_ground', x: 0, y: 600, w: worldWidth, h: 120, kind: 'ground' },
+      { id: 'w1_ledge_a', x: 420, y: 512, w: 170, h: 24 },
+      { id: 'w1_ledge_b', x: 640, y: 446, w: 180, h: 24 },
+      // Sealed overhead walls over fragile vine & every progression gate
+      { id: 'w1_vine_arch', x: 1085, y: 0, w: 84, h: 410, kind: 'pillar' },
+      { id: 'w1_hold_arch', x: 1495, y: 0, w: 80, h: 410, kind: 'pillar' },
+      // W1 Canopy Vine Labyrinth (upper & lower weave leading to Temple Sun Seal)
+      { id: 'w1_maze_step1', x: 1685, y: 516, w: 92, h: 22 },
+      { id: 'w1_maze_baffle', x: 1775, y: 340, w: 24, h: 176 },
+      { id: 'w1_maze_upper', x: 1705, y: 420, w: 72, h: 20 },
+      { id: 'w1_maze_exit_ledge', x: 1815, y: 468, w: 96, h: 22 },
+      { id: 'w1_ruin_high', x: 1960, y: 468, w: 210, h: 24 },
+      { id: 'w1_temple_arch', x: 2375, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w1_canopy_bridge', x: 2720, y: 454, w: 220, h: 24 },
+      { id: 'w1_carry_arch', x: 3175, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w1_arena_plat_l', x: 3520, y: 472, w: 140, h: 22 },
+      { id: 'w1_arena_plat_r', x: 3900, y: 472, w: 140, h: 22 },
+    ],
+    switches: [
+      {
+        id: 'sw_w1_ferry',
+        x: 780,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#65C474',
+        label: 'Vine Lift',
+      },
+      {
+        id: 'sw_w1_hold',
+        x: 1320,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'hold',
+        color: '#FBBF24',
+        label: 'Hold Relay',
+      },
+      {
+        id: 'sw_w1_latch',
+        x: 1605,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#65C474',
+        label: 'Unseal Gate',
+      },
+    ],
+    movingPlatforms: [
+      {
+        id: 'mp_w1_canopy',
+        x: 2540,
+        y: 528,
+        w: 112,
+        h: 22,
+        startX: 2540,
+        startY: 528,
+        endX: 2640,
+        endY: 456,
+        speed: 95,
+        switches: ['sw_w1_ferry'],
+        requireAll: false,
+        color: '#8BE07B',
+      },
+    ],
+    gates: [
+      {
+        id: 'gate_w1_hold',
+        x: 1520,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 760,
+        switches: ['sw_w1_hold'],
+        latchSwitches: ['sw_w1_latch'],
+        requireAll: true,
+        latchOnOpen: false,
+        color: '#FBBF24',
+      },
+      {
+        id: 'gate_w1_temple',
+        x: 2400,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 240,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#FBBF24',
+      },
+      {
+        id: 'gate_w1_carry',
+        x: 3200,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 240,
+        switches: [],
+        requiresPedestalId: 'ped_w1_relic',
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#F59E0B',
+      },
+    ],
+    keys: [
+      { id: 'key_w1_1', x: 730, y: 404, color: '#FBBF24' },
+      { id: 'key_w1_2', x: 2830, y: 410, color: '#F472B6' },
+    ],
+    checkpoints: [
+      { id: 'cp_w1_1', x: 920, y: 600 },
+      { id: 'cp_w1_2', x: 2475, y: 600, requiresPuzzleId: 'puz_w1_glyphs' },
+      { id: 'cp_w1_3', x: 3320, y: 600 },
+    ],
+    hazards: [
+      { id: 'hz_w1_1', x: 560, y: 586, w: 72, h: 14, kind: 'thorns' },
+      { id: 'hz_w1_2', x: 1840, y: 586, w: 78, h: 14, kind: 'thorns' },
+      { id: 'hz_w1_3', x: 3060, y: 586, w: 80, h: 14, kind: 'thorns' },
+    ],
+    arrowTraps: [
+      {
+        id: 'at_w1_1',
+        x: 1900,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: 1,
+        fireInterval: 2.8,
+        initialDelay: 1.4,
+        telegraphSec: 0.55,
+        projSpeed: 260,
+        damage: 18,
+        biome: 'jungle',
+      },
+    ],
+    carryBlocks: [
+      { id: 'cb_w1_relic', x: 2790, y: 564, w: 34, h: 36, label: 'Sun Idol', biome: 'jungle' },
+    ],
+    carryPedestals: [
+      {
+        id: 'ped_w1_relic',
+        x: 2975,
+        y: 600,
+        w: 48,
+        h: 12,
+        targetGateId: 'gate_w1_carry',
+        color: '#F59E0B',
+        label: 'Idol Weight',
+      },
+    ],
+    enemies: [],
+    monsters: [
+      { id: 'mon_w1_1', archetype: 'vine_gnasher', x: 1215, y: 564, minX: 1170, maxX: 1265, dir: -1 },
+      { id: 'mon_w1_2', archetype: 'spore_hurler', x: 2860, y: 560, minX: 2710, maxX: 2955, dir: -1 },
+    ],
+    weapons: [
+      { id: 'wp_w1_sword', weaponId: 'light_sword', x: 680, y: 406 },
+      { id: 'wp_w1_wand', weaponId: 'energy_wand', x: 2870, y: 414 },
+    ],
+    fragileBarriers: [
+      {
+        id: 'fb_w1_vine',
+        material: 'vine',
+        requiredTool: 'light_sword',
+        x: 1110,
+        y: 410,
+        w: 34,
+        h: 190,
+        hp: 2,
+      },
+    ],
+    puzzles: [
+      {
+        id: 'puz_w1_glyphs',
+        kind: 'alignment_pillars',
+        title: 'Temple Sun Seal',
+        tabletX: 1960,
+        tabletY: 600,
+        targetSequence: ['sun', 'moon', 'leaf'],
+        targetGateId: 'gate_w1_temple',
+        hintText: 'Align the 3 carved jungle pillars to Sun · Moon · Leaf',
+        riddleLines: [
+          'First blooms the Sun above the trees,',
+          'Then crescent Moon and emerald Leaf.',
+          'Turn each stone pillar to unseal.',
+        ],
+        nodes: [
+          { id: 'puz_w1_n1', x: 2075, y: 600, w: 34, h: 52, initialGlyphIndex: 1 },
+          { id: 'puz_w1_n2', x: 2175, y: 600, w: 34, h: 52, initialGlyphIndex: 2 },
+          { id: 'puz_w1_n3', x: 2275, y: 600, w: 34, h: 52, initialGlyphIndex: 3 },
+        ],
+      },
+    ],
+    foliage: [
+      { id: 'fol_w1_1', x: 250, y: 600, w: 68, h: 34, count: 7 },
+      { id: 'fol_w1_2', x: 970, y: 600, w: 60, h: 32, count: 6 },
+      { id: 'fol_w1_3', x: 1700, y: 600, w: 72, h: 36, count: 7 },
+      { id: 'fol_w1_4', x: 2650, y: 600, w: 68, h: 34, count: 7 },
+      { id: 'fol_w1_5', x: 3390, y: 600, w: 64, h: 32, count: 6 },
+    ],
+    bossArena: {
+      triggerX: 3500,
+      arenaMinX: 3460,
+      arenaMaxX: 4160,
+      bossX: 3940,
+      bossY: 536,
     },
+    exit: {
+      x: worldWidth - 150,
+      y: 500,
+      w: 84,
+      h: 100,
+      keysRequired: 2,
+      requiresBossDefeat: true,
+      isWeddingArch: false,
+    },
+    ladders: [
+      { id: 'lad_w1_1', x: 650, y: 446, w: 32, h: 154, material: 'vine_wood' },
+      { id: 'lad_w1_2', x: 2740, y: 454, w: 32, h: 146, material: 'vine_wood' },
+      { id: 'lad_w1_3', x: 3550, y: 472, w: 32, h: 128, material: 'vine_wood' },
+    ],
+    miniScenes: [
+      {
+        id: 'ms_w1_canopy',
+        triggerX: 280,
+        speaker: 'nadine',
+        bubbleText: 'Race you up the vine ladder, Madjid!',
+        partnerBubbleText: 'Hold my hand near the thorns!',
+        toastText: 'Mini-Scene · Climb ladders with Up/Jump & Down!',
+        danceCue: false,
+      },
+      {
+        id: 'ms_w1_sanctuary',
+        triggerX: 2490,
+        speaker: 'madjid',
+        bubbleText: 'Sunlight through the ancient canopy — together we made it.',
+        partnerBubbleText: 'One idol seal left to the Guardian!',
+        toastText: 'Mini-Scene · Sun-Seal Sanctuary',
+        danceCue: true,
+      },
+    ],
     decorations: [
-      { type: 'signpost', x: 40, y: 600 },
-      { type: 'flowers', x: 184, y: 600 },
-      { type: 'lantern', x: 348, y: 600 },
-      { type: 'lantern', x: 760, y: 600 },
-      { type: 'lantern', x: 1268, y: 600 },
-      { type: 'lantern', x: worldWidth - 152, y: 600 },
-      ...(isWeddingFinale
-        ? [
-            { type: 'flowers', x: worldWidth - 186, y: 600 },
-            { type: 'flowers', x: worldWidth - 36, y: 600 },
-          ]
-        : []),
+      { type: 'signpost', x: 42, y: 600 },
+      { type: 'flowers', x: 210, y: 600 },
+      { type: 'lantern', x: 890, y: 600 },
+      { type: 'lantern', x: 2445, y: 600 },
+      { type: 'lantern', x: 3295, y: 600 },
+      { type: 'lantern', x: worldWidth - 180, y: 600 },
+    ],
+    dynamicTraps: [],
+  };
+}
+
+function buildIceWorld(world) {
+  // EXTREME DIFFICULTY SPIKE (> 3 min clear time, brutal mirror ice chasms, multi-stage co-op)
+  const worldWidth = 9600;
+  return {
+    id: 2,
+    worldId: 2,
+    stageInWorld: 1,
+    code: '2',
+    chapterLabel: 'World 2 · Ice Lands',
+    shortCode: 'W2',
+    worldName: world.name,
+    title: 'Abyssal Glacier Gauntlet',
+    caption:
+      'Brutal mirror-ice ridges stretch across deep frozen chasms. Only disciplined teamwork across relay gates, weight plates, and crystal echoes can endure.',
+    theme: world.theme,
+    landmark: world.landmark,
+    ambient: world.ambient,
+    physicsMode: world.physicsMode,
+    gravityScale: world.gravityScale,
+    groundAccelScale: world.groundAccelScale,
+    groundFrictionScale: world.groundFrictionScale,
+    worldWidth,
+    worldHeight: 720,
+    sectors: [
+      { code: '2.1', name: 'Mirror-Ice Overlook', startX: 0 },
+      { code: '2.2', name: 'Split-Chasm Glacier Maze', startX: 1180 },
+      { code: '2.3', name: 'Frost-Weight & Icicle Spire', startX: 4540 },
+      { code: '2.4', name: 'Abyssal Glacier Vault & Warden', startX: 7200 },
+    ],
+    spawns: {
+      madjid: { x: 70, y: 564 },
+      nadine: { x: 118, y: 564 },
+    },
+    platforms: [
+      // Ground split by 5 hazardous icy abyss chasms
+      { id: 'w2_ground_1', x: 0, y: 600, w: 720, h: 120, kind: 'ground' },
+      { id: 'w2_ground_2', x: 960, y: 600, w: 1860, h: 120, kind: 'ground' },
+      { id: 'w2_ground_3', x: 3140, y: 600, w: 2020, h: 120, kind: 'ground' },
+      { id: 'w2_ground_4', x: 5440, y: 600, w: 1460, h: 120, kind: 'ground' },
+      { id: 'w2_ground_5', x: 7180, y: 600, w: worldWidth - 7180, h: 120, kind: 'ground' },
+
+      // Narrow elevated icy stepping ledges over chasms & spike gauntlets
+      { id: 'w2_ledge_a', x: 430, y: 514, w: 150, h: 24 },
+      { id: 'w2_ledge_b', x: 760, y: 472, w: 130, h: 24 },
+      { id: 'w2_ledge_c', x: 5210, y: 500, w: 155, h: 24 },
+      { id: 'w2_ledge_d', x: 6965, y: 504, w: 135, h: 24 },
+      // W2 Mirror-Ice Crystal Maze (upper staggered glacier tiers)
+      { id: 'w2_maze_entry', x: 3250, y: 504, w: 112, h: 22 },
+      { id: 'w2_maze_rise', x: 3395, y: 422, w: 118, h: 22 },
+      { id: 'w2_maze_wall', x: 3515, y: 230, w: 24, h: 192 },
+      { id: 'w2_maze_cap', x: 3560, y: 288, w: 175, h: 20 },
+      { id: 'w2_upper_key', x: 3560, y: 454, w: 175, h: 24 },
+      { id: 'w2_maze_bridge', x: 3775, y: 386, w: 155, h: 22 },
+      { id: 'w2_high_key', x: 6320, y: 446, w: 175, h: 24 },
+
+      // Overhead ceiling pillars blocking bypass over ALL barriers & co-op gates
+      { id: 'w2_frost_arch', x: 1165, y: 0, w: 86, h: 410, kind: 'pillar' },
+      { id: 'w2_hold_arch', x: 1625, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w2_glacier_arch', x: 2635, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w2_sync_arch', x: 4495, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w2_carry_arch', x: 8175, y: 0, w: 80, h: 410, kind: 'pillar' },
+
+      // Boss Arena high shelves
+      { id: 'w2_arena_plat_l', x: 8620, y: 468, w: 135, h: 22 },
+      { id: 'w2_arena_plat_r', x: 9040, y: 468, w: 135, h: 22 },
+    ],
+    switches: [
+      {
+        id: 'sw_w2_hold',
+        x: 1445,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'hold',
+        color: '#FBBF24',
+        label: 'Hold Relay',
+      },
+      {
+        id: 'sw_w2_latch',
+        x: 1740,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#38BDF8',
+        label: 'Frost Lock',
+      },
+      {
+        id: 'sw_w2_lift',
+        x: 2740,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#7CC6EB',
+        label: 'Glacier Ferry',
+      },
+      {
+        id: 'sw_w2_lift2',
+        x: 5060,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#38BDF8',
+        label: 'Abyss Ferry',
+      },
+    ],
+    movingPlatforms: [
+      {
+        id: 'mp_w2_glacier',
+        x: 2825,
+        y: 556,
+        w: 112,
+        h: 22,
+        startX: 2825,
+        startY: 556,
+        endX: 3025,
+        endY: 530,
+        speed: 68,
+        switches: ['sw_w2_lift'],
+        requireAll: false,
+        color: '#BAE6FD',
+      },
+      {
+        id: 'mp_w2_chasm',
+        x: 5165,
+        y: 558,
+        w: 112,
+        h: 22,
+        startX: 5165,
+        startY: 558,
+        endX: 5325,
+        endY: 532,
+        speed: 74,
+        switches: ['sw_w2_lift2'],
+        requireAll: false,
+        color: '#7DD3FC',
+      },
+    ],
+    gates: [
+      {
+        id: 'gate_w2_hold',
+        x: 1650,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 760,
+        switches: ['sw_w2_hold'],
+        latchSwitches: ['sw_w2_latch'],
+        requireAll: true,
+        latchOnOpen: false,
+        color: '#FBBF24',
+      },
+      {
+        id: 'gate_w2_glacier',
+        x: 2660,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 220,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#38BDF8',
+      },
+      {
+        id: 'gate_w2_sync',
+        x: 4520,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 220,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#7CC6EB',
+      },
+      {
+        id: 'gate_w2_carry',
+        x: 8200,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 220,
+        switches: [],
+        requiresPedestalId: 'ped_w2_relic',
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#38BDF8',
+      },
+    ],
+    keys: [
+      { id: 'key_w2_1', x: 820, y: 428, color: '#FBBF24' },
+      { id: 'key_w2_2', x: 3645, y: 410, color: '#38BDF8' },
+      { id: 'key_w2_3', x: 6405, y: 402, color: '#A5F3FC' },
+    ],
+    checkpoints: [
+      { id: 'cp_w2_1', x: 1005, y: 600 },
+      { id: 'cp_w2_2', x: 2710, y: 600, requiresPuzzleId: 'puz_w2_levers' },
+      { id: 'cp_w2_3', x: 4590, y: 600, requiresPuzzleId: 'puz_w2_sync' },
+      { id: 'cp_w2_escape_start', x: 5495, y: 600 },
+      { id: 'cp_w2_4', x: 7240, y: 600 },
+      { id: 'cp_w2_5', x: 8340, y: 600 },
+    ],
+    hazards: [
+      { id: 'hz_w2_1', x: 540, y: 586, w: 96, h: 14, kind: 'spikes' },
+      { id: 'hz_w2_2', x: 2940, y: 470, w: 60, h: 20, kind: 'icicle', floating: true },
+      { id: 'hz_w2_3', x: 3790, y: 586, w: 112, h: 14, kind: 'spikes' },
+      { id: 'hz_w2_4', x: 5260, y: 432, w: 60, h: 20, kind: 'icicle', floating: true },
+      { id: 'hz_w2_5', x: 5860, y: 586, w: 118, h: 14, kind: 'spikes' },
+      { id: 'hz_w2_6', x: 6995, y: 436, w: 64, h: 20, kind: 'icicle', floating: true },
+      { id: 'hz_w2_7', x: 7740, y: 586, w: 112, h: 14, kind: 'spikes' },
+    ],
+    arrowTraps: [
+      {
+        id: 'at_w2_1',
+        x: 3980,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 2.05,
+        initialDelay: 1.0,
+        telegraphSec: 0.48,
+        projSpeed: 325,
+        damage: 21,
+        biome: 'ice',
+      },
+      {
+        id: 'at_w2_2',
+        x: 4720,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: 1,
+        fireInterval: 1.98,
+        initialDelay: 1.2,
+        telegraphSec: 0.45,
+        projSpeed: 335,
+        damage: 21,
+        biome: 'ice',
+      },
+      {
+        id: 'at_w2_3',
+        x: 6180,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.92,
+        initialDelay: 0.9,
+        telegraphSec: 0.45,
+        projSpeed: 340,
+        damage: 22,
+        biome: 'ice',
+      },
+      {
+        id: 'at_w2_4',
+        x: 8110,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.90,
+        initialDelay: 1.4,
+        telegraphSec: 0.44,
+        projSpeed: 345,
+        damage: 22,
+        biome: 'ice',
+      },
+    ],
+    carryBlocks: [
+      { id: 'cb_w2_relic', x: 7340, y: 564, w: 34, h: 36, label: 'Frozen Heart', biome: 'ice' },
+    ],
+    carryPedestals: [
+      {
+        id: 'ped_w2_relic',
+        x: 8010,
+        y: 600,
+        w: 48,
+        h: 12,
+        targetGateId: 'gate_w2_carry',
+        color: '#38BDF8',
+        label: 'Glacier Seal',
+      },
+    ],
+    enemies: [],
+    monsters: [
+      { id: 'mon_w2_1', archetype: 'frost_tusk', x: 1310, y: 560, minX: 1245, maxX: 1380, dir: -1 },
+      { id: 'mon_w2_2', archetype: 'icicle_spitter', x: 3420, y: 562, minX: 3220, maxX: 3530, dir: -1 },
+      { id: 'mon_w2_3', archetype: 'frost_tusk', x: 4820, y: 560, minX: 4650, maxX: 4990, dir: -1 },
+      { id: 'mon_w2_4', archetype: 'icicle_spitter', x: 6600, y: 562, minX: 6410, maxX: 6810, dir: -1 },
+      { id: 'mon_w2_5', archetype: 'frost_tusk', x: 7540, y: 560, minX: 7400, maxX: 7690, dir: -1 },
+    ],
+    weapons: [
+      { id: 'wp_w2_hammer', weaponId: 'crystal_hammer', x: 485, y: 472 },
+      { id: 'wp_w2_sword', weaponId: 'light_sword', x: 3600, y: 414 },
+      { id: 'wp_w2_wand', weaponId: 'energy_wand', x: 6360, y: 406 },
+    ],
+    fragileBarriers: [
+      {
+        id: 'fb_w2_frost',
+        material: 'frost',
+        requiredTool: 'crystal_hammer',
+        x: 1190,
+        y: 410,
+        w: 36,
+        h: 190,
+        hp: 4,
+      },
+    ],
+    puzzles: [
+      {
+        id: 'puz_w2_levers',
+        kind: 'ordered_levers',
+        title: 'Glacial Order Rune',
+        tabletX: 2050,
+        tabletY: 600,
+        targetSequence: ['sun', 'moon', 'leaf', 'star'],
+        targetGateId: 'gate_w2_glacier',
+        hintText: 'Pull all 4 glacial levers in order: 1 -> 2 -> 3 -> 4',
+        riddleLines: [
+          'Sun melts frost, Moon brings quiet,',
+          'Leaf wakes spring, Star seals the night.',
+          'Pull levers 1 to 4 from left to right.',
+        ],
+        nodes: [
+          { id: 'puz_w2_n1', x: 2170, y: 600, w: 34, h: 52, expectedOrder: 0 },
+          { id: 'puz_w2_n2', x: 2285, y: 600, w: 34, h: 52, expectedOrder: 1 },
+          { id: 'puz_w2_n3', x: 2400, y: 600, w: 34, h: 52, expectedOrder: 2 },
+          { id: 'puz_w2_n4', x: 2515, y: 600, w: 34, h: 52, expectedOrder: 3 },
+        ],
+      },
+      {
+        id: 'puz_w2_sync',
+        kind: 'sync_plates',
+        title: 'Twin Frost Weight Lock',
+        tabletX: 4140,
+        tabletY: 600,
+        targetGateId: 'gate_w2_sync',
+        hintText: 'Madjid & Nadine must stand on both Frost Plates at the same time',
+        riddleLines: [
+          'Ice cracks beneath a lonely stride;',
+          'Only twin hearts open this frozen tide.',
+        ],
+        nodes: [
+          { id: 'puz_w2_sn1', x: 4235, y: 600, w: 46, h: 14 },
+          { id: 'puz_w2_sn2', x: 4415, y: 600, w: 46, h: 14 },
+        ],
+      },
+    ],
+    foliage: [
+      { id: 'fol_w2_1', x: 260, y: 600, w: 60, h: 28, count: 6 },
+      { id: 'fol_w2_2', x: 1800, y: 600, w: 58, h: 28, count: 6 },
+      { id: 'fol_w2_3', x: 3320, y: 600, w: 62, h: 30, count: 6 },
+      { id: 'fol_w2_4', x: 5600, y: 600, w: 62, h: 30, count: 6 },
+    ],
+    bossArena: {
+      triggerX: 8580,
+      arenaMinX: 8540,
+      arenaMaxX: 9320,
+      bossX: 9040,
+      bossY: 536,
+      maxHp: 260,
+      initialShielded: true,
+    },
+    exit: {
+      x: worldWidth - 150,
+      y: 500,
+      w: 84,
+      h: 100,
+      keysRequired: 3,
+      requiresBossDefeat: true,
+      isWeddingArch: false,
+    },
+    ladders: [
+      { id: 'lad_w2_1', x: 448, y: 514, w: 32, h: 86, material: 'frost_timber' },
+      { id: 'lad_w2_2', x: 3270, y: 504, w: 32, h: 96, material: 'frost_timber' },
+      { id: 'lad_w2_3', x: 6340, y: 446, w: 32, h: 154, material: 'frost_timber' },
+      { id: 'lad_w2_4', x: 8650, y: 468, w: 32, h: 132, material: 'frost_timber' },
+    ],
+    escapeSequence: {
+      id: 'esc_w2_avalanche',
+      title: 'Glacier Avalanche Surge!',
+      hazardKind: 'avalanche',
+      triggerX: 5560,
+      endX: 6820,
+      wallStartX: 5380,
+      wallSpeed: 98,
+      timeLimitSec: 18,
+    },
+    miniScenes: [
+      {
+        id: 'ms_w2_aurora',
+        triggerX: 1030,
+        speaker: 'madjid',
+        bubbleText: 'Hold close under the aurora — the ice is slick!',
+        partnerBubbleText: 'Brrr! Stay beside me, Madjid!',
+        toastText: 'Mini-Scene · Aurora over the Mirror Glacier',
+        danceCue: false,
+      },
+      {
+        id: 'ms_w2_after_avalanche',
+        triggerX: 7260,
+        speaker: 'nadine',
+        bubbleText: 'We outran an entire glacier together!',
+        partnerBubbleText: 'Nothing can bury us now!',
+        toastText: 'Mini-Scene · Avalanche Survivors',
+        danceCue: true,
+      },
+    ],
+    decorations: [
+      { type: 'signpost', x: 42, y: 600 },
+      { type: 'lantern', x: 980, y: 600 },
+      { type: 'lantern', x: 2690, y: 600 },
+      { type: 'lantern', x: 4565, y: 600 },
+      { type: 'lantern', x: 7215, y: 600 },
+      { type: 'lantern', x: 8315, y: 600 },
+      { type: 'lantern', x: worldWidth - 180, y: 600 },
+    ],
+    dynamicTraps: [],
+  };
+}
+
+function buildVolcanoWorld(world) {
+  const worldWidth = 10400;
+  return {
+    id: 3,
+    worldId: 3,
+    stageInWorld: 1,
+    code: '3',
+    chapterLabel: 'World 3 · Volcano',
+    shortCode: 'W3',
+    worldName: world.name,
+    title: 'Caldera of Living Obsidian',
+    caption:
+      'Roaring magma pits split the obsidian causeway. Madjid and Nadine must ride thermal updrafts, hold relay seals, and survive relentless volcanic ambushes.',
+    theme: world.theme,
+    landmark: world.landmark,
+    ambient: world.ambient,
+    physicsMode: world.physicsMode,
+    gravityScale: world.gravityScale,
+    groundAccelScale: world.groundAccelScale,
+    groundFrictionScale: world.groundFrictionScale,
+    worldWidth,
+    worldHeight: 720,
+    sectors: [
+      { code: '3.1', name: 'Magma Causeway', startX: 0 },
+      { code: '3.2', name: 'Thermal-Updraft Obsidian Maze', startX: 1340 },
+      { code: '3.3', name: 'Caldera Cipher Spire', startX: 3060 },
+      { code: '3.4', name: 'Obsidian Heart & Forge Titan', startX: 8120 },
+    ],
+    spawns: {
+      madjid: { x: 70, y: 564 },
+      nadine: { x: 118, y: 564 },
+    },
+    platforms: [
+      { id: 'w3_ground_1', x: 0, y: 600, w: 920, h: 120, kind: 'ground' },
+      { id: 'w3_ground_2', x: 1180, y: 600, w: 2240, h: 120, kind: 'ground' },
+      { id: 'w3_ground_3', x: 3720, y: 600, w: 2340, h: 120, kind: 'ground' },
+      { id: 'w3_ground_4', x: 6360, y: 600, w: 1460, h: 120, kind: 'ground' },
+      { id: 'w3_ground_5', x: 8100, y: 600, w: worldWidth - 8100, h: 120, kind: 'ground' },
+
+      { id: 'w3_ledge_a', x: 430, y: 510, w: 165, h: 24 },
+      { id: 'w3_ledge_b', x: 960, y: 468, w: 145, h: 24 },
+      // W3 Thermal-Updraft Obsidian Maze (staggered chambers above magma vent)
+      { id: 'w3_maze_left', x: 2020, y: 452, w: 115, h: 22 },
+      { id: 'w3_maze_baffle', x: 2275, y: 256, w: 26, h: 196 },
+      { id: 'w3_maze_high', x: 2301, y: 364, w: 145, h: 22 },
+      { id: 'w3_maze_drop', x: 2445, y: 454, w: 120, h: 22 },
+      { id: 'w3_lava_bridge', x: 3480, y: 478, w: 150, h: 24 },
+      { id: 'w3_forge_ledge', x: 6120, y: 472, w: 160, h: 24 },
+      { id: 'w3_ember_key_shelf', x: 7870, y: 478, w: 155, h: 24 },
+      { id: 'w3_mid_key_shelf', x: 4920, y: 446, w: 185, h: 24 },
+
+      // Sealed overhead walls over fragile obsidian & ALL gates
+      { id: 'w3_obsidian_arch', x: 1325, y: 0, w: 86, h: 410, kind: 'pillar' },
+      { id: 'w3_hold_arch', x: 1795, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w3_forge_arch', x: 2995, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w3_caldera_arch', x: 5695, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w3_carry_arch', x: 9015, y: 0, w: 80, h: 410, kind: 'pillar' },
+
+      { id: 'w3_arena_plat_l', x: 9420, y: 466, w: 140, h: 22 },
+      { id: 'w3_arena_plat_r', x: 9840, y: 466, w: 140, h: 22 },
+    ],
+    switches: [
+      {
+        id: 'sw_w3_hold',
+        x: 1615,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'hold',
+        color: '#FBBF24',
+        label: 'Hold Relay',
+      },
+      {
+        id: 'sw_w3_latch',
+        x: 1910,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#FF7844',
+        label: 'Magma Lock',
+      },
+      {
+        id: 'sw_w3_ferry',
+        x: 3320,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#FF7844',
+        label: 'Caldera Lift',
+      },
+      {
+        id: 'sw_w3_ferry2',
+        x: 7740,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#FB923C',
+        label: 'Obsidian Lift',
+      },
+    ],
+    movingPlatforms: [
+      {
+        id: 'mp_w3_forge',
+        x: 3440,
+        y: 556,
+        w: 112,
+        h: 22,
+        startX: 3440,
+        startY: 556,
+        endX: 3630,
+        endY: 526,
+        speed: 82,
+        switches: ['sw_w3_ferry'],
+        requireAll: false,
+        color: '#FB923C',
+      },
+      {
+        id: 'mp_w3_abyss',
+        x: 7830,
+        y: 556,
+        w: 112,
+        h: 22,
+        startX: 7830,
+        startY: 556,
+        endX: 8010,
+        endY: 524,
+        speed: 86,
+        switches: ['sw_w3_ferry2'],
+        requireAll: false,
+        color: '#FF7844',
+      },
+    ],
+    gates: [
+      {
+        id: 'gate_w3_hold',
+        x: 1820,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 760,
+        switches: ['sw_w3_hold'],
+        latchSwitches: ['sw_w3_latch'],
+        requireAll: true,
+        latchOnOpen: false,
+        color: '#FBBF24',
+      },
+      {
+        id: 'gate_w3_forge',
+        x: 3020,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 230,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#FB923C',
+      },
+      {
+        id: 'gate_w3_caldera',
+        x: 5720,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 230,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#FF7844',
+      },
+      {
+        id: 'gate_w3_carry',
+        x: 9040,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 230,
+        switches: [],
+        requiresPedestalId: 'ped_w3_core',
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#FF7844',
+      },
+    ],
+    keys: [
+      { id: 'key_w3_1', x: 1020, y: 422, color: '#FBBF24' },
+      { id: 'key_w3_2', x: 5000, y: 402, color: '#FB923C' },
+      { id: 'key_w3_3', x: 6190, y: 428, color: '#F472B6' },
+      { id: 'key_w3_4', x: 7945, y: 432, color: '#FDE047' },
+    ],
+    checkpoints: [
+      { id: 'cp_w3_1', x: 1220, y: 600 },
+      { id: 'cp_w3_2', x: 3095, y: 600, requiresPuzzleId: 'puz_w3_plates' },
+      { id: 'cp_w3_3', x: 5800, y: 600, requiresPuzzleId: 'puz_w3_pillars' },
+      { id: 'cp_w3_escape_start', x: 6415, y: 600 },
+      { id: 'cp_w3_4', x: 8165, y: 600 },
+      { id: 'cp_w3_5', x: 9170, y: 600 },
+    ],
+    hazards: [
+      { id: 'hz_w3_lava1', x: 615, y: 584, w: 112, h: 16, kind: 'lava', surgeInterval: 3.1 },
+      { id: 'hz_w3_lava2', x: 2150, y: 584, w: 120, h: 16, kind: 'lava', surgeInterval: 2.9 },
+      { id: 'hz_w3_spikes3', x: 3880, y: 586, w: 96, h: 14, kind: 'spikes' },
+      { id: 'hz_w3_lava4', x: 4340, y: 584, w: 128, h: 16, kind: 'lava', surgeInterval: 2.8 },
+      { id: 'hz_w3_spikes5', x: 4860, y: 586, w: 106, h: 14, kind: 'spikes' },
+      { id: 'hz_w3_lava6', x: 6580, y: 584, w: 124, h: 16, kind: 'lava', surgeInterval: 2.7 },
+      { id: 'hz_w3_lava7', x: 7180, y: 584, w: 124, h: 16, kind: 'lava', surgeInterval: 2.6 },
+      { id: 'hz_w3_spikes8', x: 8460, y: 586, w: 108, h: 14, kind: 'spikes' },
+      { id: 'hz_w3_lava9', x: 8740, y: 584, w: 112, h: 16, kind: 'lava', surgeInterval: 2.5 },
+    ],
+    thermalVents: [
+      { id: 'vent_w3_1', x: 622, y: 220, w: 92, h: 364, lift: 2150 },
+      { id: 'vent_w3_2', x: 2160, y: 220, w: 96, h: 364, lift: 2150 },
+      { id: 'vent_w3_3', x: 4350, y: 220, w: 104, h: 364, lift: 2180 },
+      { id: 'vent_w3_4', x: 6590, y: 220, w: 100, h: 364, lift: 2180 },
+    ],
+    arrowTraps: [
+      {
+        id: 'at_w3_1',
+        x: 2040,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: 1,
+        fireInterval: 1.85,
+        initialDelay: 0.9,
+        telegraphSec: 0.44,
+        projSpeed: 350,
+        damage: 23,
+        biome: 'volcano',
+      },
+      {
+        id: 'at_w3_2',
+        x: 4230,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.80,
+        initialDelay: 1.2,
+        telegraphSec: 0.44,
+        projSpeed: 355,
+        damage: 23,
+        biome: 'volcano',
+      },
+      {
+        id: 'at_w3_3',
+        x: 6880,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.76,
+        initialDelay: 0.8,
+        telegraphSec: 0.42,
+        projSpeed: 360,
+        damage: 24,
+        biome: 'volcano',
+      },
+      {
+        id: 'at_w3_4',
+        x: 7520,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.74,
+        initialDelay: 1.3,
+        telegraphSec: 0.42,
+        projSpeed: 365,
+        damage: 24,
+        biome: 'volcano',
+      },
+      {
+        id: 'at_w3_5',
+        x: 8960,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.70,
+        initialDelay: 1.0,
+        telegraphSec: 0.40,
+        projSpeed: 370,
+        damage: 24,
+        biome: 'volcano',
+      },
+    ],
+    carryBlocks: [
+      { id: 'cb_w3_core', x: 8280, y: 564, w: 34, h: 36, label: 'Obsidian Core', biome: 'volcano' },
+    ],
+    carryPedestals: [
+      {
+        id: 'ped_w3_core',
+        x: 8890,
+        y: 600,
+        w: 48,
+        h: 12,
+        targetGateId: 'gate_w3_carry',
+        color: '#FB923C',
+        label: 'Magma Seal',
+      },
+    ],
+    enemies: [],
+    monsters: [
+      { id: 'mon_w3_1', archetype: 'cinder_hound', x: 1480, y: 566, minX: 1415, maxX: 1550, dir: -1 },
+      { id: 'mon_w3_2', archetype: 'slag_bulwark', x: 2420, y: 558, minX: 2300, maxX: 2540, dir: -1 },
+      { id: 'mon_w3_3', archetype: 'cinder_hound', x: 4080, y: 566, minX: 3990, maxX: 4200, dir: -1 },
+      { id: 'mon_w3_4', archetype: 'slag_bulwark', x: 6470, y: 558, minX: 6380, maxX: 6560, dir: -1 },
+      { id: 'mon_w3_5', archetype: 'cinder_hound', x: 7420, y: 566, minX: 7330, maxX: 7500, dir: -1 },
+      { id: 'mon_w3_6', archetype: 'slag_bulwark', x: 8660, y: 558, minX: 8580, maxX: 8730, dir: -1 },
+    ],
+    weapons: [
+      { id: 'wp_w3_hammer', weaponId: 'crystal_hammer', x: 485, y: 470 },
+      { id: 'wp_w3_wand', weaponId: 'energy_wand', x: 3530, y: 438 },
+      { id: 'wp_w3_sword', weaponId: 'light_sword', x: 6165, y: 432 },
+    ],
+    fragileBarriers: [
+      {
+        id: 'fb_w3_obsidian',
+        material: 'obsidian',
+        requiredTool: 'crystal_hammer',
+        x: 1350,
+        y: 410,
+        w: 36,
+        h: 190,
+        hp: 4,
+      },
+    ],
+    puzzles: [
+      {
+        id: 'puz_w3_plates',
+        kind: 'sync_plates',
+        title: 'Twin Ember Weight Seal',
+        tabletX: 2610,
+        tabletY: 600,
+        targetGateId: 'gate_w3_forge',
+        hintText: 'Both Madjid & Nadine must step onto the Volcanic Rune Plates together',
+        riddleLines: [
+          'Two flames awaken when both stand near,',
+          'Step on both plates and lose all fear.',
+        ],
+        nodes: [
+          { id: 'puz_w3_n1', x: 2715, y: 600, w: 46, h: 14 },
+          { id: 'puz_w3_n2', x: 2900, y: 600, w: 46, h: 14 },
+        ],
+      },
+      {
+        id: 'puz_w3_pillars',
+        kind: 'alignment_pillars',
+        title: 'Caldera Crown Cipher',
+        tabletX: 5090,
+        tabletY: 600,
+        targetSequence: ['sun', 'star', 'leaf', 'moon'],
+        targetGateId: 'gate_w3_caldera',
+        hintText: 'Align the 4 obsidian pillars to Sun · Star · Leaf · Moon',
+        riddleLines: [
+          'Dawn Sun leads the blazing Star,',
+          'Leaf cools cinder, Moon guards far.',
+        ],
+        nodes: [
+          { id: 'puz_w3_pn1', x: 5210, y: 600, w: 34, h: 52, initialGlyphIndex: 1 },
+          { id: 'puz_w3_pn2', x: 5330, y: 600, w: 34, h: 52, initialGlyphIndex: 2 },
+          { id: 'puz_w3_pn3', x: 5450, y: 600, w: 34, h: 52, initialGlyphIndex: 0 },
+          { id: 'puz_w3_pn4', x: 5570, y: 600, w: 34, h: 52, initialGlyphIndex: 3 },
+        ],
+      },
+    ],
+    foliage: [
+      { id: 'fol_w3_1', x: 260, y: 600, w: 62, h: 30, count: 6 },
+      { id: 'fol_w3_2', x: 2530, y: 600, w: 60, h: 30, count: 6 },
+      { id: 'fol_w3_3', x: 5900, y: 600, w: 66, h: 32, count: 6 },
+    ],
+    bossArena: {
+      triggerX: 9380,
+      arenaMinX: 9340,
+      arenaMaxX: 10120,
+      bossX: 9840,
+      bossY: 536,
+      maxHp: 320,
+      initialShielded: true,
+    },
+    exit: {
+      x: worldWidth - 150,
+      y: 500,
+      w: 84,
+      h: 100,
+      keysRequired: 4,
+      requiresBossDefeat: true,
+      isWeddingArch: false,
+    },
+    ladders: [
+      { id: 'lad_w3_1', x: 450, y: 510, w: 32, h: 90, material: 'obsidian_iron' },
+      { id: 'lad_w3_2', x: 4940, y: 446, w: 32, h: 154, material: 'obsidian_iron' },
+      { id: 'lad_w3_3', x: 9440, y: 466, w: 32, h: 134, material: 'obsidian_iron' },
+    ],
+    escapeSequence: {
+      id: 'esc_w3_magma',
+      title: 'Caldera Magma Wave!',
+      hazardKind: 'magma_wave',
+      triggerX: 6490,
+      endX: 7740,
+      wallStartX: 6300,
+      wallSpeed: 108,
+      timeLimitSec: 17,
+    },
+    miniScenes: [
+      {
+        id: 'ms_w3_vents',
+        triggerX: 1250,
+        speaker: 'nadine',
+        bubbleText: 'Feel that caldera heat — use vents & ladders!',
+        partnerBubbleText: 'Right behind you, keep moving!',
+        toastText: 'Mini-Scene · Caldera Updrafts',
+        danceCue: false,
+      },
+      {
+        id: 'ms_w3_escape_clear',
+        triggerX: 8180,
+        speaker: 'madjid',
+        bubbleText: 'That magma wave was scorching! Ready for the core?',
+        partnerBubbleText: 'Always ready with you!',
+        toastText: 'Mini-Scene · Obsidian Heart Ahead',
+        danceCue: true,
+      },
+    ],
+    decorations: [
+      { type: 'signpost', x: 42, y: 600 },
+      { type: 'lantern', x: 1200, y: 600 },
+      { type: 'lantern', x: 3070, y: 600 },
+      { type: 'lantern', x: 5770, y: 600 },
+      { type: 'lantern', x: 8140, y: 600 },
+      { type: 'lantern', x: 9130, y: 600 },
+      { type: 'lantern', x: worldWidth - 180, y: 600 },
+    ],
+    dynamicTraps: [
+      {
+        id: 'trap_w3_snare_1',
+        kind: 'delayed_snare',
+        x: 785,
+        y: 584,
+        w: 68,
+        h: 16,
+        telegraphSec: 0.56,
+        activeSec: 1.0,
+        cooldownSec: 1.5,
+        damage: 20,
+        cause: 'Volcanic Snare',
+      },
+      {
+        id: 'trap_w3_shift_1',
+        kind: 'shifting_hazard',
+        x: 4550,
+        y: 582,
+        w: 54,
+        h: 18,
+        minX: 4520,
+        maxX: 4790,
+        speed: 125,
+        reversePeriod: 2.3,
+        damage: 22,
+        cause: 'Obsidian Saw',
+      },
+      {
+        id: 'trap_w3_collapse_1',
+        kind: 'collapsing_tile',
+        x: 6035,
+        y: 520,
+        w: 74,
+        h: 20,
+        delaySec: 0.48,
+        respawnSec: 2.3,
+      },
+      {
+        id: 'trap_w3_chain_1',
+        kind: 'trap_chain',
+        x: 6930,
+        y: 584,
+        w: 44,
+        h: 16,
+        staggerSec: 0.4,
+        telegraphSec: 0.42,
+        activeSec: 0.85,
+        cooldownSec: 1.8,
+        damage: 22,
+        cause: 'Caldera Chain',
+        stages: [
+          { x: 6935, y: 584, w: 44, h: 16 },
+          { x: 7055, y: 584, w: 44, h: 16 },
+        ],
+      },
     ],
   };
 }
 
-const STAGE_BUILDERS = [buildStage1, buildStage2, buildStage3, buildStage4, buildStage5];
+function buildSpaceWorld(world) {
+  const worldWidth = 11200;
+  return {
+    id: 4,
+    worldId: 4,
+    stageInWorld: 1,
+    code: '4',
+    chapterLabel: 'World 4 · Space',
+    shortCode: 'W4',
+    worldName: world.name,
+    title: 'Orbital Airlock Promenade',
+    caption:
+      'Drifting across starlight hulls with Zero-G thrusters, staggered plasma lasers, and sealed co-op airlocks, Madjid and Nadine route ship conduits together.',
+    theme: world.theme,
+    landmark: world.landmark,
+    ambient: world.ambient,
+    physicsMode: world.physicsMode,
+    gravityScale: world.gravityScale,
+    groundAccelScale: world.groundAccelScale,
+    groundFrictionScale: world.groundFrictionScale,
+    worldWidth,
+    worldHeight: 720,
+    sectors: [
+      { code: '4.1', name: 'Zero-G Launch Bays', startX: 0 },
+      { code: '4.2', name: 'Orbital Bulkhead & Laser Maze', startX: 1140 },
+      { code: '4.3', name: 'Starlight Docking Promenade', startX: 4160 },
+      { code: '4.4', name: 'Singularity Core & Reactor Boss', startX: 7120 },
+    ],
+    spawns: {
+      madjid: { x: 70, y: 564 },
+      nadine: { x: 118, y: 564 },
+    },
+    platforms: [
+      // Zero-G Station Pods separated by true open space chasms (no endless flat floor!)
+      { id: 'w4_launch_pad', x: 0, y: 600, w: 460, h: 120, kind: 'ground' },
+      { id: 'w4_pod_alpha', x: 860, y: 600, w: 1180, h: 120, kind: 'ground' },
+      // Open Zero-G Bulkhead & Laser Maze pod (2040..2480 space gap)
+      { id: 'w4_pod_maze_mid', x: 2130, y: 500, w: 320, h: 26 },
+      { id: 'w4_maze_top_wall', x: 2180, y: 150, w: 28, h: 190 },
+      { id: 'w4_maze_bot_wall', x: 2350, y: 270, w: 28, h: 170 },
+      { id: 'w4_pod_conduit', x: 2480, y: 600, w: 1080, h: 120, kind: 'ground' },
+      { id: 'w4_pod_beta', x: 4160, y: 600, w: 660, h: 120, kind: 'ground' },
+      { id: 'w4_pod_beta_mid', x: 4920, y: 472, w: 380, h: 24 },
+      { id: 'w4_pod_gamma', x: 5420, y: 600, w: 1260, h: 120, kind: 'ground' },
+      { id: 'w4_pod_delta', x: 7120, y: 600, w: 2140, h: 120, kind: 'ground' },
+      // Zero-G pre-boss floating station islands (9260..10020 space chasm)
+      { id: 'w4_pod_preboss_1', x: 9380, y: 486, w: 190, h: 24 },
+      { id: 'w4_pod_preboss_2', x: 9700, y: 396, w: 190, h: 24 },
+      { id: 'w4_boss_deck', x: 10020, y: 600, w: worldWidth - 10020, h: 120, kind: 'ground' },
 
-function buildCampaignLevels() {
-  const built = [];
-  for (let wIdx = 0; wIdx < WORLDS.length; wIdx++) {
-    const world = WORLDS[wIdx];
-    const storyPack = STAGE_STORY_CATALOG[wIdx];
-    for (let sIdx = 0; sIdx < 5; sIdx++) {
-      built.push(STAGE_BUILDERS[sIdx](world, wIdx, storyPack[sIdx]));
-    }
-  }
-  return built;
+      // Keep x:540..610, y:200..460 completely clear for Zero-G flight test in src/game.test.ts!
+      { id: 'w4_deck_a', x: 400, y: 492, w: 125, h: 24 },
+      { id: 'w4_deck_b', x: 640, y: 392, w: 165, h: 24 },
+      { id: 'w4_catwalk_1', x: 3740, y: 452, w: 260, h: 24 },
+      { id: 'w4_catwalk_2', x: 6760, y: 438, w: 240, h: 24 },
+      { id: 'w4_airlock_upper', x: 2460, y: 446, w: 210, h: 24 },
+
+      // Full-height floor-to-ceiling bulkheads above energy barrier & ALL airlock gates (no Zero-G flyover!)
+      { id: 'w4_hull_roof', x: 1095, y: 0, w: 86, h: 410, kind: 'pillar' },
+      { id: 'w4_hold_roof', x: 1625, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w4_airlock_roof', x: 3325, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w4_sync_roof', x: 5895, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w4_carry_roof', x: 8895, y: 0, w: 80, h: 410, kind: 'pillar' },
+
+      { id: 'w4_arena_plat_l', x: 10220, y: 446, w: 150, h: 22 },
+      { id: 'w4_arena_plat_r', x: 10640, y: 446, w: 150, h: 22 },
+    ],
+    switches: [
+      {
+        id: 'sw_w4_hold',
+        x: 1445,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'hold',
+        color: '#FBBF24',
+        label: 'Hold Airlock',
+      },
+      {
+        id: 'sw_w4_latch',
+        x: 1740,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#60E8FF',
+        label: 'Airlock Seal',
+      },
+      {
+        id: 'sw_w4_elevator',
+        x: 3440,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#60E8FF',
+        label: 'Grav Lift',
+      },
+    ],
+    movingPlatforms: [
+      {
+        id: 'mp_w4_grav',
+        x: 3560,
+        y: 536,
+        w: 114,
+        h: 22,
+        startX: 3560,
+        startY: 536,
+        endX: 3645,
+        endY: 452,
+        speed: 98,
+        switches: ['sw_w4_elevator'],
+        requireAll: false,
+        color: '#78DCFA',
+      },
+    ],
+    gates: [
+      {
+        id: 'gate_w4_hold',
+        x: 1650,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 760,
+        switches: ['sw_w4_hold'],
+        latchSwitches: ['sw_w4_latch'],
+        requireAll: true,
+        latchOnOpen: false,
+        color: '#FBBF24',
+      },
+      {
+        id: 'gate_w4_airlock',
+        x: 3350,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 240,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#22D3EE',
+      },
+      {
+        id: 'gate_w4_sync',
+        x: 5920,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 240,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#60E8FF',
+      },
+      {
+        id: 'gate_w4_carry',
+        x: 8920,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 240,
+        switches: [],
+        requiresPedestalId: 'ped_w4_core',
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#38BDF8',
+      },
+    ],
+    keys: [
+      { id: 'key_w4_1', x: 720, y: 320, color: '#FBBF24' },
+      { id: 'key_w4_2', x: 3860, y: 404, color: '#22D3EE' },
+      { id: 'key_w4_3', x: 6865, y: 390, color: '#F472B6' },
+      { id: 'key_w4_4', x: 8420, y: 330, color: '#60E8FF' },
+    ],
+    checkpoints: [
+      { id: 'cp_w4_1', x: 900, y: 600 },
+      { id: 'cp_w4_2', x: 3410, y: 600, requiresPuzzleId: 'puz_w4_conduits' },
+      { id: 'cp_w4_3', x: 6005, y: 600, requiresPuzzleId: 'puz_w4_sync' },
+      { id: 'cp_w4_4', x: 7220, y: 600 },
+      { id: 'cp_w4_5', x: 9065, y: 600 },
+    ],
+    hazards: [
+      {
+        id: 'hz_w4_laser1',
+        x: 635,
+        y: 165,
+        w: 18,
+        h: 225,
+        kind: 'laser_beam',
+        floating: true,
+        cyclePeriod: 3.0,
+        phase: 0,
+        damage: 24,
+      },
+      { id: 'hz_w4_ast1', x: 500, y: 540, w: 46, h: 42, kind: 'asteroid', floating: true, damage: 22 },
+      {
+        id: 'hz_w4_laser2',
+        x: 2040,
+        y: 220,
+        w: 18,
+        h: 360,
+        kind: 'laser_beam',
+        floating: true,
+        cyclePeriod: 2.8,
+        phase: 1.1,
+        damage: 24,
+      },
+      {
+        id: 'hz_w4_laser3',
+        x: 3810,
+        y: 150,
+        w: 18,
+        h: 270,
+        kind: 'laser_beam',
+        floating: true,
+        cyclePeriod: 2.7,
+        phase: 0.4,
+        damage: 24,
+      },
+      { id: 'hz_w4_ast2', x: 3960, y: 515, w: 50, h: 44, kind: 'asteroid', floating: true, damage: 22 },
+      {
+        id: 'hz_w4_laser4',
+        x: 4660,
+        y: 220,
+        w: 18,
+        h: 360,
+        kind: 'laser_beam',
+        floating: true,
+        cyclePeriod: 2.6,
+        phase: 1.3,
+        damage: 25,
+      },
+      {
+        id: 'hz_w4_laser5',
+        x: 6260,
+        y: 220,
+        w: 18,
+        h: 360,
+        kind: 'laser_beam',
+        floating: true,
+        cyclePeriod: 2.5,
+        phase: 0.2,
+        damage: 25,
+      },
+      { id: 'hz_w4_ast3', x: 6820, y: 510, w: 52, h: 46, kind: 'asteroid', floating: true, damage: 22 },
+      {
+        id: 'hz_w4_laser6',
+        x: 7020,
+        y: 200,
+        w: 18,
+        h: 360,
+        kind: 'laser_beam',
+        floating: true,
+        cyclePeriod: 2.4,
+        phase: 1.2,
+        damage: 25,
+      },
+      {
+        id: 'hz_w4_laser7',
+        x: 7740,
+        y: 210,
+        w: 18,
+        h: 365,
+        kind: 'laser_beam',
+        floating: true,
+        cyclePeriod: 2.4,
+        phase: 0.6,
+        damage: 26,
+      },
+      { id: 'hz_w4_ast4', x: 8420, y: 470, w: 54, h: 46, kind: 'asteroid', floating: true, damage: 24 },
+    ],
+    arrowTraps: [
+      {
+        id: 'at_w4_1',
+        x: 1960,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: 1,
+        fireInterval: 1.68,
+        initialDelay: 0.9,
+        telegraphSec: 0.42,
+        projSpeed: 375,
+        damage: 25,
+        biome: 'space',
+      },
+      {
+        id: 'at_w4_2',
+        x: 4540,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.62,
+        initialDelay: 1.1,
+        telegraphSec: 0.40,
+        projSpeed: 380,
+        damage: 25,
+        biome: 'space',
+      },
+      {
+        id: 'at_w4_3',
+        x: 5255,
+        y: 434,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.58,
+        initialDelay: 0.8,
+        telegraphSec: 0.40,
+        projSpeed: 385,
+        damage: 25,
+        biome: 'space',
+      },
+      {
+        id: 'at_w4_4',
+        x: 6600,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.56,
+        initialDelay: 1.2,
+        telegraphSec: 0.38,
+        projSpeed: 390,
+        damage: 26,
+        biome: 'space',
+      },
+      {
+        id: 'at_w4_5',
+        x: 7580,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.54,
+        initialDelay: 0.7,
+        telegraphSec: 0.38,
+        projSpeed: 392,
+        damage: 26,
+        biome: 'space',
+      },
+      {
+        id: 'at_w4_6',
+        x: 8820,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.52,
+        initialDelay: 1.0,
+        telegraphSec: 0.38,
+        projSpeed: 395,
+        damage: 26,
+        biome: 'space',
+      },
+    ],
+    carryBlocks: [
+      { id: 'cb_w4_core', x: 7420, y: 564, w: 34, h: 36, label: 'Star Core', biome: 'space' },
+    ],
+    carryPedestals: [
+      {
+        id: 'ped_w4_core',
+        x: 8710,
+        y: 600,
+        w: 48,
+        h: 12,
+        targetGateId: 'gate_w4_carry',
+        color: '#60E8FF',
+        label: 'Reactor Seal',
+      },
+    ],
+    enemies: [],
+    monsters: [
+      { id: 'mon_w4_1', archetype: 'void_leech', x: 1280, y: 564, minX: 1195, maxX: 1375, dir: -1 },
+      { id: 'mon_w4_2', archetype: 'plasma_orbiter', x: 2290, y: 458, minX: 2150, maxX: 2425, dir: -1 },
+      { id: 'mon_w4_3', archetype: 'void_leech', x: 4360, y: 564, minX: 4220, maxX: 4510, dir: -1 },
+      { id: 'mon_w4_4', archetype: 'plasma_orbiter', x: 5060, y: 430, minX: 4935, maxX: 5230, dir: -1 },
+      { id: 'mon_w4_5', archetype: 'void_leech', x: 6420, y: 564, minX: 6300, maxX: 6560, dir: -1 },
+      { id: 'mon_w4_6', archetype: 'plasma_orbiter', x: 7940, y: 556, minX: 7810, maxX: 8160, dir: -1 },
+      { id: 'mon_w4_7', archetype: 'void_leech', x: 8480, y: 564, minX: 8300, maxX: 8670, dir: -1 },
+    ],
+    weapons: [
+      { id: 'wp_w4_wand', weaponId: 'energy_wand', x: 445, y: 452 },
+      { id: 'wp_w4_mkey', weaponId: 'mechanism_key', x: 2545, y: 406 },
+      { id: 'wp_w4_sword', weaponId: 'light_sword', x: 6850, y: 398 },
+    ],
+    fragileBarriers: [
+      {
+        id: 'fb_w4_energy',
+        material: 'energy',
+        requiredTool: 'energy_wand',
+        altTool: 'mechanism_key',
+        x: 1120,
+        y: 410,
+        w: 36,
+        h: 190,
+        hp: 4,
+      },
+    ],
+    puzzles: [
+      {
+        id: 'puz_w4_conduits',
+        kind: 'conduit_locks',
+        title: 'Airlock Power Conduit',
+        tabletX: 2540,
+        tabletY: 600,
+        targetGateId: 'gate_w4_airlock',
+        hintText: 'Energize all 4 airlock conduits with Energy Wand or Mechanism Key',
+        riddleLines: [
+          'Four dark relays starve for light;',
+          'Strike them with Wand or Key in flight.',
+        ],
+        nodes: [
+          { id: 'puz_w4_n1', x: 2670, y: 600, w: 34, h: 52 },
+          { id: 'puz_w4_n2', x: 2820, y: 600, w: 34, h: 52 },
+          { id: 'puz_w4_n3', x: 2970, y: 600, w: 34, h: 52 },
+          { id: 'puz_w4_n4', x: 3120, y: 600, w: 34, h: 52 },
+        ],
+      },
+      {
+        id: 'puz_w4_sync',
+        kind: 'sync_plates',
+        title: 'Zero-G Docking Lock',
+        tabletX: 5490,
+        tabletY: 600,
+        targetGateId: 'gate_w4_sync',
+        hintText: 'Both Madjid & Nadine must anchor onto both Docking Plates simultaneously',
+        riddleLines: [
+          'Zero-G drifts lovers apart in space;',
+          'Dock both boots together in this place.',
+        ],
+        nodes: [
+          { id: 'puz_w4_sn1', x: 5610, y: 600, w: 46, h: 14 },
+          { id: 'puz_w4_sn2', x: 5800, y: 600, w: 46, h: 14 },
+        ],
+      },
+    ],
+    foliage: [
+      { id: 'fol_w4_1', x: 280, y: 600, w: 58, h: 28, count: 5 },
+      { id: 'fol_w4_2', x: 9120, y: 600, w: 60, h: 28, count: 5 },
+    ],
+    bossArena: {
+      triggerX: 10180,
+      arenaMinX: 10140,
+      arenaMaxX: 10920,
+      bossX: 10640,
+      bossY: 536,
+      maxHp: 390,
+      initialShielded: true,
+    },
+    exit: {
+      x: worldWidth - 150,
+      y: 500,
+      w: 84,
+      h: 100,
+      keysRequired: 4,
+      requiresBossDefeat: true,
+      isWeddingArch: false,
+    },
+    ladders: [
+      { id: 'lad_w4_1', x: 2490, y: 446, w: 32, h: 154, material: 'plasma_lattice' },
+      { id: 'lad_w4_2', x: 10240, y: 446, w: 32, h: 154, material: 'plasma_lattice' },
+    ],
+    miniScenes: [
+      {
+        id: 'ms_w4_zerog',
+        triggerX: 920,
+        speaker: 'nadine',
+        bubbleText: 'Look at that ringed giant — floating in space with you!',
+        partnerBubbleText: 'Hold Space or Down to steer Zero-G!',
+        toastText: 'Mini-Scene · Starlight Drift',
+        danceCue: true,
+      },
+    ],
+    decorations: [
+      { type: 'signpost', x: 42, y: 600 },
+      { type: 'lantern', x: 880, y: 600 },
+      { type: 'lantern', x: 3390, y: 600 },
+      { type: 'lantern', x: 5980, y: 600 },
+      { type: 'lantern', x: 7190, y: 600 },
+      { type: 'lantern', x: 9030, y: 600 },
+      { type: 'lantern', x: worldWidth - 180, y: 600 },
+    ],
+    dynamicTraps: [
+      {
+        id: 'trap_w4_snare_1',
+        kind: 'delayed_snare',
+        x: 1005,
+        y: 584,
+        w: 68,
+        h: 16,
+        telegraphSec: 0.5,
+        activeSec: 1.05,
+        cooldownSec: 1.45,
+        damage: 22,
+        cause: 'Plasma Snare',
+      },
+      {
+        id: 'trap_w4_collapse_1',
+        kind: 'collapsing_tile',
+        x: 1960,
+        y: 520,
+        w: 72,
+        h: 20,
+        delaySec: 0.44,
+        respawnSec: 2.3,
+      },
+      {
+        id: 'trap_w4_collapse_2',
+        kind: 'collapsing_tile',
+        x: 5315,
+        y: 520,
+        w: 80,
+        h: 20,
+        delaySec: 0.44,
+        respawnSec: 2.3,
+      },
+      {
+        id: 'trap_w4_shift_1',
+        kind: 'shifting_hazard',
+        x: 6090,
+        y: 582,
+        w: 54,
+        h: 18,
+        minX: 6065,
+        maxX: 6225,
+        speed: 155,
+        reversePeriod: 2.0,
+        damage: 24,
+        cause: 'Orbital Cutter',
+      },
+      {
+        id: 'trap_w4_chain_1',
+        kind: 'trap_chain',
+        x: 6315,
+        y: 584,
+        w: 44,
+        h: 16,
+        staggerSec: 0.36,
+        telegraphSec: 0.38,
+        activeSec: 0.85,
+        cooldownSec: 1.7,
+        damage: 24,
+        cause: 'Reactor Chain',
+        stages: [
+          { x: 6315, y: 584, w: 44, h: 16 },
+          { x: 6425, y: 584, w: 44, h: 16 },
+          { x: 6535, y: 584, w: 44, h: 16 },
+        ],
+      },
+      {
+        id: 'trap_w4_snare_2',
+        kind: 'delayed_snare',
+        x: 7560,
+        y: 584,
+        w: 68,
+        h: 16,
+        telegraphSec: 0.48,
+        activeSec: 1.05,
+        cooldownSec: 1.4,
+        damage: 24,
+        cause: 'Singularity Snare',
+      },
+    ],
+  };
 }
 
-export const LEVELS = buildCampaignLevels();
+function buildOceanWorld(world) {
+  const worldWidth = 12000;
+  return {
+    id: 5,
+    worldId: 5,
+    stageInWorld: 1,
+    code: '5',
+    chapterLabel: 'World 5 · Ocean World',
+    shortCode: 'W5',
+    worldName: world.name,
+    title: 'Abyssal Sanctuary & Wedding Arch',
+    caption:
+      'Sweeping ocean currents guard the final coral seals. Together, Madjid and Nadine brave the deepest abyssal gauntlet toward their Wedding Arch.',
+    theme: world.theme,
+    landmark: world.landmark,
+    ambient: world.ambient,
+    physicsMode: world.physicsMode,
+    gravityScale: world.gravityScale,
+    groundAccelScale: world.groundAccelScale,
+    groundFrictionScale: world.groundFrictionScale,
+    worldWidth,
+    worldHeight: 720,
+    sectors: [
+      { code: '5.1', name: 'Coral Shallows & Drift', startX: 0 },
+      { code: '5.2', name: 'Sunken Abyssal Coral Maze', startX: 1180 },
+      { code: '5.3', name: 'Tidal Sanctum & Vow Plates', startX: 4060 },
+      { code: '5.4', name: 'Grand Wedding Reef & Arch', startX: 7040 },
+    ],
+    spawns: {
+      madjid: { x: 70, y: 564 },
+      nadine: { x: 118, y: 564 },
+    },
+    oceanCurrents: [
+      { id: 'cur_w5_1', x: 520, y: 240, w: 320, h: 330, vx: 95, vy: -36 },
+      { id: 'cur_w5_2', x: 2150, y: 260, w: 300, h: 310, vx: -86, vy: -28 },
+      { id: 'cur_w5_3', x: 3750, y: 250, w: 280, h: 320, vx: 98, vy: -42 },
+      { id: 'cur_w5_4', x: 6600, y: 240, w: 320, h: 330, vx: -92, vy: 34 },
+      { id: 'cur_w5_5', x: 8600, y: 250, w: 300, h: 320, vx: -95, vy: -32 },
+    ],
+    platforms: [
+      // Keep x:200..270, y:340..550 clear for Ocean swim test in src/game.test.ts!
+      // Deep reef islands separated by open underwater swim trenches & coral labyrinth
+      { id: 'w5_launch_reef', x: 0, y: 600, w: 470, h: 120, kind: 'ground' },
+      { id: 'w5_reef_1', x: 920, y: 600, w: 1200, h: 120, kind: 'ground' },
+      // W5 Sunken Abyssal Coral Maze (open ocean trench 2120..2680)
+      { id: 'w5_maze_reef_hi', x: 2180, y: 322, w: 210, h: 24 },
+      { id: 'w5_maze_wall_1', x: 2300, y: 170, w: 28, h: 152 },
+      { id: 'w5_maze_reef_lo', x: 2340, y: 472, w: 240, h: 24 },
+      { id: 'w5_maze_wall_2', x: 2490, y: 342, w: 28, h: 130 },
+      { id: 'w5_reef_2', x: 2680, y: 600, w: 980, h: 120, kind: 'ground' },
+      { id: 'w5_reef_3', x: 4060, y: 600, w: 600, h: 120, kind: 'ground' },
+      { id: 'w5_trench_coral', x: 4740, y: 480, w: 340, h: 24 },
+      { id: 'w5_reef_4', x: 5180, y: 600, w: 1440, h: 120, kind: 'ground' },
+      { id: 'w5_reef_5', x: 7040, y: 600, w: 2880, h: 120, kind: 'ground' },
+      // Open underwater bridal reef crossing before Final Boss & Wedding Arch (9920..10820)
+      { id: 'w5_arch_step1', x: 10040, y: 486, w: 185, h: 24 },
+      { id: 'w5_arch_step2', x: 10380, y: 422, w: 195, h: 24 },
+      { id: 'w5_wedding_reef', x: 10820, y: 600, w: worldWidth - 10820, h: 120, kind: 'ground' },
+
+      { id: 'w5_coral_a', x: 420, y: 492, w: 165, h: 24 },
+      { id: 'w5_coral_b', x: 650, y: 392, w: 170, h: 24 },
+      { id: 'w5_sanctuary_deck', x: 3740, y: 444, w: 220, h: 24 },
+      { id: 'w5_abyss_shelf', x: 6720, y: 432, w: 220, h: 24 },
+      { id: 'w5_vault_shelf', x: 8160, y: 422, w: 185, h: 24 },
+
+      // Floor-to-ceiling coral walls above coral barrier & ALL progression gates (impossible to swim over)
+      { id: 'w5_reef_arch', x: 1125, y: 0, w: 86, h: 410, kind: 'pillar' },
+      { id: 'w5_hold_arch', x: 1685, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w5_sanctuary_arch', x: 3445, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w5_sync_arch', x: 6195, y: 0, w: 80, h: 410, kind: 'pillar' },
+      { id: 'w5_carry_arch', x: 9595, y: 0, w: 80, h: 410, kind: 'pillar' },
+
+      { id: 'w5_arena_plat_l', x: 10980, y: 454, w: 150, h: 22 },
+      { id: 'w5_arena_plat_r', x: 11400, y: 454, w: 150, h: 22 },
+    ],
+    switches: [
+      {
+        id: 'sw_w5_hold',
+        x: 1505,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'hold',
+        color: '#FBBF24',
+        label: 'Hold Tide Gate',
+      },
+      {
+        id: 'sw_w5_latch',
+        x: 1800,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#5EEAD4',
+        label: 'Coral Lock',
+      },
+      {
+        id: 'sw_w5_tide',
+        x: 3560,
+        y: 600,
+        w: 44,
+        h: 12,
+        mode: 'toggle',
+        color: '#5EEAD4',
+        label: 'Tide Lift',
+      },
+    ],
+    movingPlatforms: [
+      {
+        id: 'mp_w5_tide',
+        x: 3680,
+        y: 534,
+        w: 114,
+        h: 22,
+        startX: 3680,
+        startY: 534,
+        endX: 3770,
+        endY: 454,
+        speed: 96,
+        switches: ['sw_w5_tide'],
+        requireAll: false,
+        color: '#6EE7D4',
+      },
+    ],
+    gates: [
+      {
+        id: 'gate_w5_hold',
+        x: 1710,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 760,
+        switches: ['sw_w5_hold'],
+        latchSwitches: ['sw_w5_latch'],
+        requireAll: true,
+        latchOnOpen: false,
+        color: '#FBBF24',
+      },
+      {
+        id: 'gate_w5_sanctuary',
+        x: 3470,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 240,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#5EEAD4',
+      },
+      {
+        id: 'gate_w5_sync',
+        x: 6220,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 240,
+        switches: [],
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#5EEAD4',
+      },
+      {
+        id: 'gate_w5_carry',
+        x: 9620,
+        y: 410,
+        w: 28,
+        h: 190,
+        openOffsetX: 0,
+        openOffsetY: -190,
+        speed: 240,
+        switches: [],
+        requiresPedestalId: 'ped_w5_pearl',
+        requireAll: true,
+        latchOnOpen: true,
+        color: '#5EEAD4',
+      },
+    ],
+    keys: [
+      { id: 'key_w5_1', x: 745, y: 348, color: '#FBBF24' },
+      { id: 'key_w5_2', x: 3840, y: 398, color: '#F472B6' },
+      { id: 'key_w5_3', x: 6825, y: 388, color: '#5EEAD4' },
+      { id: 'key_w5_4', x: 8250, y: 378, color: '#FDE047' },
+      { id: 'key_w5_5', x: 9220, y: 320, color: '#A5F3FC' },
+    ],
+    checkpoints: [
+      { id: 'cp_w5_1', x: 960, y: 600 },
+      { id: 'cp_w5_2', x: 3530, y: 600, requiresPuzzleId: 'puz_w5_pillars' },
+      { id: 'cp_w5_escape_start', x: 5365, y: 600 },
+      { id: 'cp_w5_3', x: 6300, y: 600, requiresPuzzleId: 'puz_w5_sync' },
+      { id: 'cp_w5_4', x: 7160, y: 600 },
+      { id: 'cp_w5_5', x: 9740, y: 600 },
+    ],
+    hazards: [
+      { id: 'hz_w5_jelly1', x: 615, y: 465, w: 40, h: 42, kind: 'jellyfish', floating: true, damage: 22 },
+      { id: 'hz_w5_urchin1', x: 2040, y: 582, w: 62, h: 18, kind: 'urchin', damage: 24 },
+      { id: 'hz_w5_jelly2', x: 2360, y: 360, w: 40, h: 42, kind: 'jellyfish', floating: true, damage: 22 },
+      { id: 'hz_w5_jelly3', x: 3810, y: 475, w: 40, h: 42, kind: 'jellyfish', floating: true, damage: 24 },
+      { id: 'hz_w5_urchin2', x: 4320, y: 582, w: 64, h: 18, kind: 'urchin', damage: 24 },
+      { id: 'hz_w5_jelly4', x: 4760, y: 350, w: 40, h: 42, kind: 'jellyfish', floating: true, damage: 24 },
+      { id: 'hz_w5_urchin3', x: 5260, y: 582, w: 64, h: 18, kind: 'urchin', damage: 24 },
+      { id: 'hz_w5_jelly5', x: 6680, y: 320, w: 40, h: 42, kind: 'jellyfish', floating: true, damage: 24 },
+      { id: 'hz_w5_urchin4', x: 7600, y: 582, w: 66, h: 18, kind: 'urchin', damage: 25 },
+      { id: 'hz_w5_jelly6', x: 7940, y: 340, w: 40, h: 42, kind: 'jellyfish', floating: true, damage: 25 },
+      { id: 'hz_w5_urchin5', x: 8420, y: 582, w: 66, h: 18, kind: 'urchin', damage: 25 },
+      { id: 'hz_w5_jelly7', x: 8960, y: 360, w: 40, h: 42, kind: 'jellyfish', floating: true, damage: 25 },
+      { id: 'hz_w5_urchin6', x: 9280, y: 582, w: 66, h: 18, kind: 'urchin', damage: 26 },
+    ],
+    arrowTraps: [
+      {
+        id: 'at_w5_1',
+        x: 1960,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: 1,
+        fireInterval: 1.54,
+        initialDelay: 0.9,
+        telegraphSec: 0.40,
+        projSpeed: 395,
+        damage: 26,
+        biome: 'ocean',
+      },
+      {
+        id: 'at_w5_2',
+        x: 4540,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.50,
+        initialDelay: 1.1,
+        telegraphSec: 0.38,
+        projSpeed: 400,
+        damage: 26,
+        biome: 'ocean',
+      },
+      {
+        id: 'at_w5_3',
+        x: 5460,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.48,
+        initialDelay: 0.7,
+        telegraphSec: 0.38,
+        projSpeed: 405,
+        damage: 26,
+        biome: 'ocean',
+      },
+      {
+        id: 'at_w5_4',
+        x: 7440,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.44,
+        initialDelay: 1.2,
+        telegraphSec: 0.36,
+        projSpeed: 408,
+        damage: 27,
+        biome: 'ocean',
+      },
+      {
+        id: 'at_w5_5',
+        x: 8260,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.42,
+        initialDelay: 0.8,
+        telegraphSec: 0.36,
+        projSpeed: 412,
+        damage: 27,
+        biome: 'ocean',
+      },
+      {
+        id: 'at_w5_6',
+        x: 8860,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.40,
+        initialDelay: 1.0,
+        telegraphSec: 0.36,
+        projSpeed: 415,
+        damage: 27,
+        biome: 'ocean',
+      },
+      {
+        id: 'at_w5_7',
+        x: 9540,
+        y: 562,
+        w: 32,
+        h: 38,
+        dir: -1,
+        fireInterval: 1.38,
+        initialDelay: 0.6,
+        telegraphSec: 0.35,
+        projSpeed: 418,
+        damage: 28,
+        biome: 'ocean',
+      },
+    ],
+    carryBlocks: [
+      { id: 'cb_w5_pearl', x: 7300, y: 564, w: 34, h: 36, label: 'Reef Pearl', biome: 'ocean' },
+    ],
+    carryPedestals: [
+      {
+        id: 'ped_w5_pearl',
+        x: 9410,
+        y: 600,
+        w: 48,
+        h: 12,
+        targetGateId: 'gate_w5_carry',
+        color: '#5EEAD4',
+        label: 'Coral Weight',
+      },
+    ],
+    enemies: [],
+    monsters: [
+      { id: 'mon_w5_1', archetype: 'barnacle_hulk', x: 1320, y: 558, minX: 1220, maxX: 1435, dir: -1 },
+      { id: 'mon_w5_2', archetype: 'ink_wretch', x: 2420, y: 434, minX: 2350, maxX: 2550, dir: -1 },
+      { id: 'mon_w5_3', archetype: 'barnacle_hulk', x: 4220, y: 558, minX: 4100, maxX: 4300, dir: -1 },
+      { id: 'mon_w5_4', archetype: 'ink_wretch', x: 4900, y: 442, minX: 4755, maxX: 5055, dir: -1 },
+      { id: 'mon_w5_5', archetype: 'barnacle_hulk', x: 5680, y: 558, minX: 5540, maxX: 5820, dir: -1 },
+      { id: 'mon_w5_6', archetype: 'ink_wretch', x: 7780, y: 562, minX: 7690, maxX: 7920, dir: -1 },
+      { id: 'mon_w5_7', archetype: 'barnacle_hulk', x: 8660, y: 558, minX: 8510, maxX: 8820, dir: -1 },
+      { id: 'mon_w5_8', archetype: 'ink_wretch', x: 9120, y: 562, minX: 8960, maxX: 9260, dir: -1 },
+    ],
+    weapons: [
+      { id: 'wp_w5_sword', weaponId: 'light_sword', x: 475, y: 452 },
+      { id: 'wp_w5_wand', weaponId: 'energy_wand', x: 3820, y: 404 },
+      { id: 'wp_w5_hammer', weaponId: 'crystal_hammer', x: 6790, y: 392 },
+    ],
+    fragileBarriers: [
+      {
+        id: 'fb_w5_coral',
+        material: 'coral',
+        requiredTool: 'light_sword',
+        altTool: 'energy_wand',
+        x: 1150,
+        y: 410,
+        w: 36,
+        h: 190,
+        hp: 5,
+      },
+    ],
+    puzzles: [
+      {
+        id: 'puz_w5_pillars',
+        kind: 'alignment_pillars',
+        title: 'Sunken Sanctuary Seal',
+        tabletX: 2740,
+        tabletY: 600,
+        targetSequence: ['wave', 'moon', 'sun', 'star'],
+        targetGateId: 'gate_w5_sanctuary',
+        hintText: 'Align all 4 coral pillars to Wave · Moon · Sun · Star',
+        riddleLines: [
+          'Tidal Wave rises to meet silver Moon,',
+          'Sun warms the abyss, Star seals our tune.',
+        ],
+        nodes: [
+          { id: 'puz_w5_n1', x: 2870, y: 600, w: 34, h: 52, initialGlyphIndex: 1 },
+          { id: 'puz_w5_n2', x: 3000, y: 600, w: 34, h: 52, initialGlyphIndex: 2 },
+          { id: 'puz_w5_n3', x: 3130, y: 600, w: 34, h: 52, initialGlyphIndex: 3 },
+          { id: 'puz_w5_n4', x: 3260, y: 600, w: 34, h: 52, initialGlyphIndex: 0 },
+        ],
+      },
+      {
+        id: 'puz_w5_sync',
+        kind: 'sync_plates',
+        title: 'Abyssal Wedding Vow Plates',
+        tabletX: 5790,
+        tabletY: 600,
+        targetGateId: 'gate_w5_sync',
+        hintText: 'Madjid & Nadine must step onto both Coral Plates together',
+        riddleLines: [
+          'No single soul may claim the bridal gate;',
+          'Press both Coral Plates together with your mate.',
+        ],
+        nodes: [
+          { id: 'puz_w5_sn1', x: 5900, y: 600, w: 46, h: 14 },
+          { id: 'puz_w5_sn2', x: 6090, y: 600, w: 46, h: 14 },
+        ],
+      },
+    ],
+    foliage: [
+      { id: 'fol_w5_1', x: 285, y: 600, w: 72, h: 42, count: 8 },
+      { id: 'fol_w5_2', x: 1020, y: 600, w: 66, h: 38, count: 7 },
+      { id: 'fol_w5_3', x: 2700, y: 600, w: 72, h: 40, count: 8 },
+      { id: 'fol_w5_4', x: 4200, y: 600, w: 70, h: 40, count: 7 },
+      { id: 'fol_w5_5', x: 9820, y: 600, w: 70, h: 40, count: 7 },
+    ],
+    bossArena: {
+      triggerX: 10960,
+      arenaMinX: 10920,
+      arenaMaxX: 11700,
+      bossX: 11420,
+      bossY: 536,
+      maxHp: 460,
+      initialShielded: true,
+    },
+    exit: {
+      x: worldWidth - 150,
+      y: 500,
+      w: 84,
+      h: 100,
+      keysRequired: 5,
+      requiresBossDefeat: true,
+      isWeddingArch: true,
+    },
+    ladders: [
+      { id: 'lad_w5_1', x: 8185, y: 422, w: 32, h: 178, material: 'coral_bamboo' },
+      { id: 'lad_w5_2', x: 11005, y: 454, w: 32, h: 146, material: 'coral_bamboo' },
+    ],
+    escapeSequence: {
+      id: 'esc_w5_tide',
+      title: 'Abyssal Tide Breach!',
+      hazardKind: 'abyssal_tide',
+      triggerX: 5415,
+      endX: 5760,
+      wallStartX: 5250,
+      wallSpeed: 92,
+      timeLimitSec: 15,
+    },
+    miniScenes: [
+      {
+        id: 'ms_w5_reef',
+        triggerX: 980,
+        speaker: 'madjid',
+        bubbleText: 'Our Wedding Arch waits beyond the final reef, Nadine.',
+        partnerBubbleText: 'Hand in hand — let us finish the journey!',
+        toastText: 'Mini-Scene · Abyssal Reef Promise',
+        danceCue: false,
+      },
+      {
+        id: 'ms_w5_wedding_approach',
+        triggerX: 10840,
+        speaker: 'nadine',
+        bubbleText: 'The Abyssal Wedding Sanctuary is right ahead!',
+        partnerBubbleText: 'Defeat the Leviathan together and claim our vow!',
+        toastText: 'Mini-Scene · Bridal Reef Finale',
+        danceCue: true,
+      },
+    ],
+    decorations: [
+      { type: 'signpost', x: 42, y: 600 },
+      { type: 'flowers', x: 210, y: 600 },
+      { type: 'lantern', x: 935, y: 600 },
+      { type: 'lantern', x: 3505, y: 600 },
+      { type: 'lantern', x: 6275, y: 600 },
+      { type: 'lantern', x: 7130, y: 600 },
+      { type: 'lantern', x: 9705, y: 600 },
+      { type: 'flowers', x: worldWidth - 190, y: 600 },
+      { type: 'flowers', x: worldWidth - 40, y: 600 },
+    ],
+    dynamicTraps: [
+      {
+        id: 'trap_w5_snare_1',
+        kind: 'delayed_snare',
+        x: 1020,
+        y: 584,
+        w: 68,
+        h: 16,
+        telegraphSec: 0.46,
+        activeSec: 1.1,
+        cooldownSec: 1.35,
+        damage: 24,
+        cause: 'Abyssal Snare',
+      },
+      {
+        id: 'trap_w5_collapse_1',
+        kind: 'collapsing_tile',
+        x: 1995,
+        y: 516,
+        w: 72,
+        h: 20,
+        delaySec: 0.4,
+        respawnSec: 2.2,
+      },
+      {
+        id: 'trap_w5_collapse_2',
+        kind: 'collapsing_tile',
+        x: 5090,
+        y: 516,
+        w: 78,
+        h: 20,
+        delaySec: 0.4,
+        respawnSec: 2.2,
+      },
+      {
+        id: 'trap_w5_chain_1',
+        kind: 'trap_chain',
+        x: 6355,
+        y: 584,
+        w: 44,
+        h: 16,
+        staggerSec: 0.34,
+        telegraphSec: 0.36,
+        activeSec: 0.9,
+        cooldownSec: 1.6,
+        damage: 25,
+        cause: 'Tidal Trap Chain',
+        stages: [
+          { x: 6355, y: 584, w: 44, h: 16 },
+          { x: 6445, y: 584, w: 44, h: 16 },
+          { x: 6535, y: 584, w: 44, h: 16 },
+        ],
+      },
+      {
+        id: 'trap_w5_shift_1',
+        kind: 'shifting_hazard',
+        x: 7270,
+        y: 582,
+        w: 54,
+        h: 18,
+        minX: 7230,
+        maxX: 7440,
+        speed: 175,
+        reversePeriod: 1.85,
+        damage: 25,
+        cause: 'Abyssal Blade',
+      },
+      {
+        id: 'trap_w5_snare_2',
+        kind: 'delayed_snare',
+        x: 7470,
+        y: 584,
+        w: 68,
+        h: 16,
+        telegraphSec: 0.45,
+        activeSec: 1.1,
+        cooldownSec: 1.3,
+        damage: 25,
+        cause: 'Coral Snare',
+      },
+      {
+        id: 'trap_w5_shift_2',
+        kind: 'shifting_hazard',
+        x: 7820,
+        y: 582,
+        w: 54,
+        h: 18,
+        minX: 7720,
+        maxX: 8040,
+        speed: 185,
+        reversePeriod: 1.75,
+        damage: 26,
+        cause: 'Tidal Saw',
+      },
+      {
+        id: 'trap_w5_chain_2',
+        kind: 'trap_chain',
+        x: 8760,
+        y: 584,
+        w: 44,
+        h: 16,
+        staggerSec: 0.32,
+        telegraphSec: 0.35,
+        activeSec: 0.92,
+        cooldownSec: 1.55,
+        damage: 26,
+        cause: 'Reef Sanctum Chain',
+        stages: [
+          { x: 8760, y: 584, w: 44, h: 16 },
+          { x: 8865, y: 584, w: 44, h: 16 },
+          { x: 8970, y: 584, w: 44, h: 16 },
+        ],
+      },
+    ],
+  };
+}
+
+export const LEVELS = [
+  buildJungleWorld(WORLDS[0]),
+  buildIceWorld(WORLDS[1]),
+  buildVolcanoWorld(WORLDS[2]),
+  buildSpaceWorld(WORLDS[3]),
+  buildOceanWorld(WORLDS[4]),
+];
 
 export function getWorldById(worldId) {
   return WORLDS.find((w) => w.id === worldId) || WORLDS[0];

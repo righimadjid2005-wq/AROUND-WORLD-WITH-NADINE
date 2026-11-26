@@ -121,6 +121,151 @@ export const TIME_PRESETS = {
     platformBody: '#1F2C45',
     platformTrim: '#111A2B',
   },
+  jungle: {
+    id: 'jungle',
+    label: 'Jungle Dawn',
+    skyTop: hexToRgb('#2A5C48'),
+    skyMid: hexToRgb('#7DB878'),
+    skyLow: hexToRgb('#DDF2B8'),
+    sunColor: hexToRgb('#FFF9D6'),
+    sunHalo: hexToRgb('#FFE08A'),
+    sunXRatio: 0.72,
+    sunYRatio: 0.28,
+    sunRadius: 44,
+    sunAlpha: 0.9,
+    moonAlpha: 0,
+    starAlpha: 0.05,
+    lanternAlpha: 0.25,
+    cloudFill: hexToRgb('#EFFBE8'),
+    cloudShade: hexToRgb('#9ECBA2'),
+    cloudAlpha: 0.74,
+    hillFar: hexToRgb('#447B5B'),
+    hillMid: hexToRgb('#2E6146'),
+    hillNear: hexToRgb('#1E4534'),
+    hazeColor: hexToRgb('#C8EEAE'),
+    hazeAlpha: 0.25,
+    moteColor: hexToRgb('#E2FFBA'),
+    platformTop: '#56A654',
+    platformTopRim: '#8BE07B',
+    platformBody: '#3A4A3A',
+    platformTrim: '#1B281E',
+  },
+  ice: {
+    id: 'ice',
+    label: 'Frozen Aurora',
+    skyTop: hexToRgb('#18365C'),
+    skyMid: hexToRgb('#4C84B5'),
+    skyLow: hexToRgb('#C2EBFF'),
+    sunColor: hexToRgb('#F0FAFF'),
+    sunHalo: hexToRgb('#9CE3FF'),
+    sunXRatio: 0.68,
+    sunYRatio: 0.26,
+    sunRadius: 40,
+    sunAlpha: 0.78,
+    moonAlpha: 0.15,
+    starAlpha: 0.35,
+    lanternAlpha: 0.4,
+    cloudFill: hexToRgb('#EBF9FF'),
+    cloudShade: hexToRgb('#93C6E6'),
+    cloudAlpha: 0.72,
+    hillFar: hexToRgb('#6FA8D1'),
+    hillMid: hexToRgb('#4A85B3'),
+    hillNear: hexToRgb('#2D5E88'),
+    hazeColor: hexToRgb('#DDF5FF'),
+    hazeAlpha: 0.26,
+    moteColor: hexToRgb('#FFFFFF'),
+    platformTop: '#7CC6EB',
+    platformTopRim: '#CFF2FF',
+    platformBody: '#2A4E70',
+    platformTrim: '#152B42',
+  },
+  volcano: {
+    id: 'volcano',
+    label: 'Volcanic Dusk',
+    skyTop: hexToRgb('#1E0E1C'),
+    skyMid: hexToRgb('#6E2326'),
+    skyLow: hexToRgb('#DF5926'),
+    sunColor: hexToRgb('#FFD29A'),
+    sunHalo: hexToRgb('#FF6A2B'),
+    sunXRatio: 0.3,
+    sunYRatio: 0.38,
+    sunRadius: 46,
+    sunAlpha: 0.88,
+    moonAlpha: 0,
+    starAlpha: 0.14,
+    lanternAlpha: 0.72,
+    cloudFill: hexToRgb('#8C4A46'),
+    cloudShade: hexToRgb('#401B1E'),
+    cloudAlpha: 0.82,
+    hillFar: hexToRgb('#592222'),
+    hillMid: hexToRgb('#3D181A'),
+    hillNear: hexToRgb('#261012'),
+    hazeColor: hexToRgb('#FF7A38'),
+    hazeAlpha: 0.24,
+    moteColor: hexToRgb('#FFB066'),
+    platformTop: '#783B35',
+    platformTopRim: '#FF7844',
+    platformBody: '#281C22',
+    platformTrim: '#120A0E',
+  },
+  space: {
+    id: 'space',
+    label: 'Orbital Nebula',
+    skyTop: hexToRgb('#060818'),
+    skyMid: hexToRgb('#151C42'),
+    skyLow: hexToRgb('#29366B'),
+    sunColor: hexToRgb('#A5F3FC'),
+    sunHalo: hexToRgb('#38BDF8'),
+    sunXRatio: 0.5,
+    sunYRatio: 0.9,
+    sunRadius: 30,
+    sunAlpha: 0,
+    moonAlpha: 0.9,
+    starAlpha: 1,
+    lanternAlpha: 0.15,
+    cloudFill: hexToRgb('#283C70'),
+    cloudShade: hexToRgb('#131D3B'),
+    cloudAlpha: 0.32,
+    hillFar: hexToRgb('#1C264F'),
+    hillMid: hexToRgb('#161F42'),
+    hillNear: hexToRgb('#101733'),
+    hazeColor: hexToRgb('#38BDF8'),
+    hazeAlpha: 0.14,
+    moteColor: hexToRgb('#7DD3FC'),
+    platformTop: '#3C6E91',
+    platformTopRim: '#78DCFA',
+    platformBody: '#1B2540',
+    platformTrim: '#0D1426',
+  },
+  ocean: {
+    id: 'ocean',
+    label: 'Abyssal Sanctuary',
+    skyTop: hexToRgb('#09324A'),
+    skyMid: hexToRgb('#146482'),
+    skyLow: hexToRgb('#34B3B8'),
+    sunColor: hexToRgb('#CCFBF1'),
+    sunHalo: hexToRgb('#5EEAD4'),
+    sunXRatio: 0.5,
+    sunYRatio: 0.08,
+    sunRadius: 52,
+    sunAlpha: 0.45,
+    moonAlpha: 0,
+    starAlpha: 0.12,
+    lanternAlpha: 0.45,
+    cloudFill: hexToRgb('#2F8F9D'),
+    cloudShade: hexToRgb('#175769'),
+    cloudAlpha: 0.3,
+    hillFar: hexToRgb('#1A5D70'),
+    hillMid: hexToRgb('#134659'),
+    hillNear: hexToRgb('#0D3445'),
+    hazeColor: hexToRgb('#5EEAD4'),
+    hazeAlpha: 0.18,
+    moteColor: hexToRgb('#A7F3D0'),
+    platformTop: '#26948A',
+    platformTopRim: '#6EE7D4',
+    platformBody: '#153447',
+    platformTrim: '#0A1E2B',
+  },
 };
 
 export const WEATHER_PRESETS = {
@@ -128,17 +273,27 @@ export const WEATHER_PRESETS = {
   rain: { id: 'rain', label: 'Soft Rain' },
   wind: { id: 'wind', label: 'Breeze & Petals' },
   fireflies: { id: 'fireflies', label: 'Fireflies' },
+  snow: { id: 'snow', label: 'Snowflakes' },
+  embers: { id: 'embers', label: 'Volcanic Embers' },
+  bubbles: { id: 'bubbles', label: 'Ocean Bubbles' },
 };
 
 export function getWeatherForWorld(worldId) {
   switch (Number(worldId)) {
+    case 1:
+      return 'wind';
+    case 2:
+      return 'snow';
     case 3:
+      return 'embers';
+    case 4:
+      return 'clear';
+    case 5:
+      return 'bubbles';
     case 6:
       return 'rain';
-    case 4:
     case 7:
       return 'wind';
-    case 5:
     case 8:
     case 9:
       return 'fireflies';
@@ -176,7 +331,97 @@ function clonePreset(preset) {
   };
 }
 
-export function createBackgroundSystem(initialTheme = 'sunrise') {
+const NIGHT_SKY_TOP = [9, 18, 42];
+const NIGHT_SKY_MID = [20, 36, 74];
+const NIGHT_SKY_LOW = [38, 62, 108];
+const NIGHT_HILL_FAR = [27, 45, 82];
+const NIGHT_HILL_MID = [20, 34, 64];
+const NIGHT_HILL_NEAR = [14, 24, 48];
+const NIGHT_CLOUD_FILL = [54, 80, 128];
+const NIGHT_CLOUD_SHADE = [26, 43, 80];
+const NIGHT_HAZE = [74, 111, 165];
+const DAY_SKY_LIFT = [214, 228, 248];
+const DAY_HILL_LIFT = [148, 174, 206];
+
+/**
+ * Computes an effective Day or Night atmospheric preset from any biome base preset
+ * without mutating TIME_PRESETS or sacrificing world identity.
+ */
+export function resolvePresetForTimeOfDay(basePreset, mode = 'day') {
+  const source = basePreset || TIME_PRESETS.sunrise;
+  const resolved = clonePreset(source);
+  const timeOfDay = mode === 'night' ? 'night' : 'day';
+
+  if (timeOfDay === 'night') {
+    if (source.id === 'night') {
+      resolved.lanternAlpha = 1;
+      resolved.moonAlpha = 1;
+      resolved.starAlpha = 1;
+      return resolved;
+    }
+    const skyMix = source.id === 'space' ? 0.36 : source.id === 'volcano' ? 0.56 : 0.66;
+    const hillMix = source.id === 'space' ? 0.34 : 0.6;
+    resolved.skyTop = lerpRgb(source.skyTop, NIGHT_SKY_TOP, skyMix);
+    resolved.skyMid = lerpRgb(source.skyMid, NIGHT_SKY_MID, skyMix);
+    resolved.skyLow = lerpRgb(source.skyLow, NIGHT_SKY_LOW, skyMix * 0.92);
+    resolved.cloudFill = lerpRgb(source.cloudFill, NIGHT_CLOUD_FILL, 0.58);
+    resolved.cloudShade = lerpRgb(source.cloudShade, NIGHT_CLOUD_SHADE, 0.58);
+    resolved.cloudAlpha = Math.min(source.cloudAlpha, 0.56);
+    resolved.hillFar = lerpRgb(source.hillFar, NIGHT_HILL_FAR, hillMix);
+    resolved.hillMid = lerpRgb(source.hillMid, NIGHT_HILL_MID, hillMix);
+    resolved.hillNear = lerpRgb(source.hillNear, NIGHT_HILL_NEAR, hillMix);
+    resolved.hazeColor = lerpRgb(source.hazeColor, NIGHT_HAZE, 0.52);
+    resolved.hazeAlpha = Math.max(0.14, Math.min(0.22, source.hazeAlpha));
+    resolved.sunAlpha = source.id === 'volcano' ? 0.26 : 0;
+    resolved.moonAlpha = source.id === 'ocean' ? 0.62 : 0.96;
+    resolved.starAlpha = source.id === 'ocean' ? 0.48 : 0.98;
+    resolved.lanternAlpha = 1;
+    resolved.moteColor = [255, 226, 153];
+    return resolved;
+  }
+
+  // Day Mode: bright, crisp daylight clarity across every world
+  if (source.id === 'night') {
+    const dayRef = clonePreset(TIME_PRESETS.sunrise);
+    dayRef.id = source.id;
+    dayRef.platformTop = source.platformTop;
+    dayRef.platformTopRim = source.platformTopRim;
+    dayRef.platformBody = source.platformBody;
+    dayRef.platformTrim = source.platformTrim;
+    return dayRef;
+  }
+
+  if (source.id === 'volcano' || source.id === 'sunset' || source.id === 'ocean') {
+    const lift = source.id === 'ocean' ? 0.16 : 0.24;
+    resolved.skyTop = lerpRgb(source.skyTop, DAY_SKY_LIFT, lift);
+    resolved.skyMid = lerpRgb(source.skyMid, DAY_SKY_LIFT, lift * 0.85);
+    resolved.skyLow = lerpRgb(source.skyLow, [255, 240, 214], lift * 0.7);
+    resolved.hillFar = lerpRgb(source.hillFar, DAY_HILL_LIFT, lift * 0.75);
+    resolved.hillMid = lerpRgb(source.hillMid, DAY_HILL_LIFT, lift * 0.55);
+    resolved.sunAlpha = source.id === 'ocean' ? 0.64 : Math.max(source.sunAlpha, 0.82);
+    resolved.moonAlpha = 0;
+    resolved.starAlpha = 0.05;
+    resolved.lanternAlpha = 0.24;
+  } else if (source.id === 'space') {
+    resolved.skyTop = lerpRgb(source.skyTop, [32, 50, 96], 0.34);
+    resolved.skyMid = lerpRgb(source.skyMid, [56, 86, 146], 0.34);
+    resolved.skyLow = lerpRgb(source.skyLow, [86, 124, 184], 0.3);
+    resolved.hillFar = lerpRgb(source.hillFar, [64, 92, 152], 0.28);
+    resolved.hillMid = lerpRgb(source.hillMid, [48, 74, 130], 0.26);
+    resolved.sunAlpha = 0.42;
+    resolved.moonAlpha = 0.45;
+    resolved.starAlpha = 0.82;
+    resolved.lanternAlpha = 0.2;
+  } else {
+    resolved.sunAlpha = Math.max(source.sunAlpha, 0.88);
+    resolved.moonAlpha = 0;
+    resolved.starAlpha = Math.min(source.starAlpha, 0.08);
+    resolved.lanternAlpha = Math.min(source.lanternAlpha, 0.28);
+  }
+  return resolved;
+}
+
+export function createBackgroundSystem(initialTheme = 'sunrise', initialTimeOfDay = 'day') {
   const rand = mulberry32(202607);
 
   const stars = Array.from({ length: 84 }, () => ({
@@ -231,7 +476,8 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
   }));
 
   let targetName = TIME_PRESETS[initialTheme] ? initialTheme : 'sunrise';
-  let current = clonePreset(TIME_PRESETS[targetName]);
+  let timeOfDayMode = initialTimeOfDay === 'night' ? 'night' : 'day';
+  let current = resolvePresetForTimeOfDay(TIME_PRESETS[targetName], timeOfDayMode);
   let landmarkStyle = 'cottages';
   let ambientStyle = 'petals';
   let weatherType = 'clear';
@@ -241,7 +487,13 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
     if (TIME_PRESETS[themeName]) {
       targetName = themeName;
       if (instant) {
-        current = clonePreset(TIME_PRESETS[targetName]);
+        current = resolvePresetForTimeOfDay(TIME_PRESETS[targetName], timeOfDayMode);
+      }
+    }
+    if (options.timeOfDay === 'day' || options.timeOfDay === 'night') {
+      timeOfDayMode = options.timeOfDay;
+      if (instant) {
+        current = resolvePresetForTimeOfDay(TIME_PRESETS[targetName], timeOfDayMode);
       }
     }
     if (options.landmark) landmarkStyle = options.landmark;
@@ -250,6 +502,18 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
       weatherType = options.weather;
     }
     customPlatformStyle = options.platformPalette || null;
+  }
+
+  function setTimeOfDayMode(mode, instant = false) {
+    timeOfDayMode = mode === 'night' ? 'night' : 'day';
+    if (instant) {
+      current = resolvePresetForTimeOfDay(TIME_PRESETS[targetName], timeOfDayMode);
+    }
+    return timeOfDayMode;
+  }
+
+  function getTimeOfDayMode() {
+    return timeOfDayMode;
   }
 
   function setWeather(weather) {
@@ -272,7 +536,7 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
 
   function getPlatformStyle() {
     if (customPlatformStyle) return customPlatformStyle;
-    const p = TIME_PRESETS[targetName];
+    const p = resolvePresetForTimeOfDay(TIME_PRESETS[targetName], timeOfDayMode);
     return {
       top: p.platformTop,
       topRim: p.platformTopRim,
@@ -282,7 +546,7 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
   }
 
   function update(dt) {
-    const target = TIME_PRESETS[targetName];
+    const target = resolvePresetForTimeOfDay(TIME_PRESETS[targetName], timeOfDayMode);
     const blend = Math.min(1, dt * 2.4);
 
     current.skyTop = lerpRgb(current.skyTop, target.skyTop, blend);
@@ -345,6 +609,91 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
   function drawWorldLandmark(ctx, sx, hy, idx, color, time) {
     const glowAlpha = Math.max(0.28, current.lanternAlpha * 0.8);
     ctx.fillStyle = color;
+
+    if (landmarkStyle === 'jungle_ruins') {
+      // Jungle temple pyramid + broadleaf palm canopy
+      if (Math.abs(idx) % 2 === 0) {
+        ctx.fillRect(sx - 18, hy - 14, 36, 18);
+        ctx.fillRect(sx - 12, hy - 26, 24, 14);
+        ctx.fillRect(sx - 6, hy - 35, 12, 10);
+        ctx.fillStyle = `rgba(190, 242, 100, ${glowAlpha.toFixed(2)})`;
+        ctx.fillRect(sx - 3, hy - 20, 6, 6);
+      } else {
+        ctx.fillRect(sx - 3, hy - 32, 6, 36);
+        for (let a = -2; a <= 2; a++) {
+          ctx.beginPath();
+          ctx.ellipse(sx + a * 8, hy - 30 + Math.abs(a) * 3, 10, 4, a * 0.35, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      return;
+    }
+
+    if (landmarkStyle === 'glaciers') {
+      // Jagged crystalline glacier spires
+      ctx.beginPath();
+      ctx.moveTo(sx - 20, hy + 4);
+      ctx.lineTo(sx - 8, hy - 42);
+      ctx.lineTo(sx + 2, hy - 18);
+      ctx.lineTo(sx + 10, hy - 52);
+      ctx.lineTo(sx + 24, hy + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(224, 247, 255, 0.32)';
+      ctx.beginPath();
+      ctx.moveTo(sx + 10, hy - 52);
+      ctx.lineTo(sx + 18, hy + 4);
+      ctx.lineTo(sx + 6, hy + 4);
+      ctx.closePath();
+      ctx.fill();
+      return;
+    }
+
+    if (landmarkStyle === 'calderas') {
+      // Jagged volcanic cone with molten rim glow
+      ctx.beginPath();
+      ctx.moveTo(sx - 30, hy + 4);
+      ctx.lineTo(sx - 12, hy - 38);
+      ctx.lineTo(sx + 12, hy - 38);
+      ctx.lineTo(sx + 30, hy + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = `rgba(255, 118, 46, ${Math.max(0.45, glowAlpha).toFixed(2)})`;
+      ctx.fillRect(sx - 10, hy - 40, 20, 4);
+      return;
+    }
+
+    if (landmarkStyle === 'space_station') {
+      // Orbital dome & radio spire
+      ctx.fillRect(sx - 20, hy - 14, 40, 18);
+      ctx.beginPath();
+      ctx.arc(sx, hy - 14, 15, Math.PI, 0);
+      ctx.fill();
+      ctx.fillRect(sx - 2, hy - 42, 4, 16);
+      ctx.fillStyle = `rgba(103, 232, 249, ${Math.max(0.5, glowAlpha).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(sx, hy - 43, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(sx - 12, hy - 10, 24, 4);
+      return;
+    }
+
+    if (landmarkStyle === 'coral_temple') {
+      // Sunken ocean coral spires & pearl dome
+      ctx.beginPath();
+      ctx.arc(sx, hy - 16, 14, Math.PI, 0);
+      ctx.lineTo(sx + 14, hy + 4);
+      ctx.lineTo(sx - 14, hy + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(sx - 22, hy - 26, 5, 30);
+      ctx.fillRect(sx + 17, hy - 32, 5, 36);
+      ctx.fillStyle = `rgba(153, 246, 228, ${Math.max(0.45, glowAlpha).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(sx, hy - 10, 4, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
 
     if (landmarkStyle === 'windmills') {
       // Cozy meadow windmill with slowly rotating sails
@@ -736,6 +1085,42 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
         ctx.arc(mx, my, r, 0, Math.PI * 2);
       }
       ctx.fill();
+    } else if (ambientStyle === 'snow') {
+      ctx.fillStyle = 'rgba(236, 250, 255, 0.85)';
+      ctx.beginPath();
+      for (let i = 0; i < motes.length; i++) {
+        const m = motes[i];
+        const mx = ((((m.x + Math.sin(time + m.phase) * 0.03 + time * m.vx * 0.5) % 1) + 1) % 1) * width;
+        const my = ((((m.y + time * m.vy * 4.5) % 1) + 1) % 1) * height;
+        const r = m.r * 1.1;
+        ctx.moveTo(mx + r, my);
+        ctx.arc(mx, my, r, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    } else if (ambientStyle === 'embers') {
+      for (let i = 0; i < motes.length; i++) {
+        const m = motes[i];
+        const mx = ((((m.x + Math.sin(time * 2 + m.phase) * 0.025 + time * m.vx * 0.4) % 1) + 1) % 1) * width;
+        const my = ((((1 - (m.y + time * m.vy * 5.2) % 1) + 1) % 1)) * height;
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 168, 76, 0.85)' : 'rgba(255, 92, 46, 0.72)';
+        ctx.beginPath();
+        ctx.arc(mx, my, m.r * 1.05, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (ambientStyle === 'bubbles') {
+      ctx.strokeStyle = 'rgba(204, 251, 241, 0.72)';
+      ctx.fillStyle = 'rgba(153, 246, 228, 0.22)';
+      ctx.lineWidth = 1.3;
+      for (let i = 0; i < motes.length; i++) {
+        const m = motes[i];
+        const mx = ((((m.x + Math.sin(time * 1.8 + m.phase) * 0.02) % 1) + 1) % 1) * width;
+        const my = ((((1 - (m.y + time * m.vy * 4.0) % 1) + 1) % 1)) * height;
+        const r = 2.4 + m.r * 1.25;
+        ctx.beginPath();
+        ctx.arc(mx, my, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     } else {
       // Gentle drifting sun motes / dandelion seeds
       ctx.fillStyle = rgbStr(current.moteColor, 0.62);
@@ -791,11 +1176,28 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
       ctx.restore();
     }
 
-    // 3. Sun (Sunrise / Sunset)
+    // 3. Sun (Sunrise / Sunset) + Subtle Atmospheric Sunbeams
     if (current.sunAlpha > 0.02) {
       const sunX = width * current.sunXRatio - cameraX * 0.03;
       const sunY = height * current.sunYRatio - cameraY * 0.02;
       const r = current.sunRadius;
+
+      if (targetName === 'sunrise' || targetName === 'jungle') {
+        ctx.save();
+        ctx.fillStyle = rgbStr(current.sunHalo, 0.048 * current.sunAlpha);
+        for (let ray = -2; ray <= 2; ray++) {
+          const ang = 0.72 + ray * 0.19 + Math.sin(time * 0.25 + ray) * 0.03;
+          const farX = sunX + Math.cos(ang) * width * 0.9;
+          const farY = sunY + Math.sin(ang) * height * 1.1;
+          ctx.beginPath();
+          ctx.moveTo(sunX, sunY);
+          ctx.lineTo(farX - 48, farY);
+          ctx.lineTo(farX + 48, farY);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
 
       ctx.fillStyle = rgbStr(current.sunHalo, 0.1 * current.sunAlpha);
       ctx.beginPath();
@@ -902,14 +1304,107 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
       drawHangingLantern(ctx, width * 0.67 - cameraX * 0.08, 90, time + 1.8, current.lanternAlpha * 0.9);
     }
 
-    // 12. World-Matched Ambient Particles (Fireflies / Petals / Sun Motes)
-    const effectiveAmbient = weatherType === 'fireflies' ? 'fireflies' : weatherType === 'wind' ? 'petals' : ambientStyle;
+    // 12. World-Matched Ambient Particles (Fireflies at night when petals/clear, or biome weather)
+    const effectiveAmbient =
+      weatherType === 'fireflies'
+        ? 'fireflies'
+        : weatherType === 'wind'
+          ? timeOfDayMode === 'night' && ambientStyle === 'petals'
+            ? 'fireflies'
+            : 'petals'
+          : weatherType === 'snow'
+            ? 'snow'
+            : weatherType === 'embers'
+              ? 'embers'
+              : weatherType === 'bubbles'
+                ? 'bubbles'
+                : timeOfDayMode === 'night' && ambientStyle === 'petals'
+                  ? 'fireflies'
+                  : ambientStyle;
     const prevAmbient = ambientStyle;
     ambientStyle = effectiveAmbient;
     renderAmbientParticles(ctx, width, height, time);
     ambientStyle = prevAmbient;
 
-    // 13. Weather Overlay (Rain streaks + splashes OR Sweeping Wind gusts)
+    // 13. Weather & Biome Atmosphere Overlays (strictly deterministic math)
+    if (targetName === 'ice') {
+      // Shimmering polar aurora borealis ribbons drifting smoothly across upper glacial sky
+      ctx.save();
+      for (let band = 0; band < 2; band++) {
+        const yBase = height * (0.17 + band * 0.08);
+        const auroraGrad = ctx.createLinearGradient(0, yBase - 42, 0, yBase + 46);
+        auroraGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+        auroraGrad.addColorStop(0.45, band === 0 ? 'rgba(94, 234, 212, 0.14)' : 'rgba(125, 211, 252, 0.11)');
+        auroraGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        ctx.fillStyle = auroraGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, yBase - 36);
+        for (let sx = 0; sx <= width; sx += 48) {
+          const wave = Math.sin(sx * 0.008 + time * 0.45 + band * 1.9 - cameraX * 0.002) * 18;
+          ctx.lineTo(sx, yBase + wave);
+        }
+        ctx.lineTo(width, yBase + 52);
+        ctx.lineTo(0, yBase + 52);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    } else if (targetName === 'volcano') {
+      // Warm molten caldera horizon glow rising from lower crater rim
+      ctx.save();
+      const emberGlow = ctx.createLinearGradient(0, height * 0.62, 0, height);
+      const pulse = 0.14 + Math.sin(time * 1.6) * 0.03;
+      emberGlow.addColorStop(0, 'rgba(251, 146, 60, 0)');
+      emberGlow.addColorStop(0.7, `rgba(249, 115, 22, ${pulse.toFixed(3)})`);
+      emberGlow.addColorStop(1, `rgba(239, 68, 68, ${(pulse + 0.09).toFixed(3)})`);
+      ctx.fillStyle = emberGlow;
+      ctx.fillRect(0, height * 0.62, width, height * 0.38);
+      ctx.restore();
+    } else if (targetName === 'space') {
+      // Distant ringed gas giant + soft iridescent nebula band in Space
+      ctx.save();
+      const px = width * 0.22 - cameraX * 0.025;
+      const py = height * 0.23;
+      const nebula = ctx.createRadialGradient(px + 28, py + 12, 12, px + 28, py + 12, 165);
+      nebula.addColorStop(0, 'rgba(139, 92, 246, 0.18)');
+      nebula.addColorStop(0.55, 'rgba(56, 189, 248, 0.08)');
+      nebula.addColorStop(1, 'rgba(15, 23, 42, 0)');
+      ctx.fillStyle = nebula;
+      ctx.beginPath();
+      ctx.arc(px + 28, py + 12, 165, 0, Math.PI * 2);
+      ctx.fill();
+
+      const pGrad = ctx.createRadialGradient(px - 10, py - 10, 6, px, py, 44);
+      pGrad.addColorStop(0, '#A5F3FC');
+      pGrad.addColorStop(0.6, '#6366F1');
+      pGrad.addColorStop(1, '#1E1B4B');
+      ctx.fillStyle = pGrad;
+      ctx.beginPath();
+      ctx.arc(px, py, 36, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(165, 243, 252, 0.55)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(px, py, 60, 13, -0.22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    } else if (targetName === 'ocean') {
+      // Shimmering underwater sun caustic beams from surface
+      ctx.save();
+      ctx.fillStyle = 'rgba(153, 246, 228, 0.09)';
+      for (let b = 0; b < 5; b++) {
+        const bx = width * (0.1 + b * 0.21) + Math.sin(time * 0.9 + b * 1.1) * 18;
+        ctx.beginPath();
+        ctx.moveTo(bx - 16, 0);
+        ctx.lineTo(bx + 26, 0);
+        ctx.lineTo(bx + 92, height);
+        ctx.lineTo(bx - 42, height);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     if (weatherType === 'rain') {
       ctx.save();
       ctx.fillStyle = 'rgba(18, 28, 54, 0.12)';
@@ -956,10 +1451,32 @@ export function createBackgroundSystem(initialTheme = 'sunrise') {
       }
       ctx.restore();
     }
+    // Subtle floating sunlit dust/spore motes for rich atmospheric depth (zero-allocation)
+    ctx.save();
+    for (let m = 0; m < 12; m++) {
+      const mx = (((m * 0.137 + time * (0.012 + (m % 3) * 0.004) - cameraX * 0.00018) % 1 + 1) % 1) * width;
+      const my = (((m * 0.219 + Math.sin(time * 0.7 + m) * 0.04) % 0.85 + 0.85) % 0.85) * height + height * 0.06;
+      const mr = 1.1 + (m % 3) * 0.55;
+      const alpha = 0.16 + Math.sin(time * 1.8 + m * 1.3) * 0.1;
+      ctx.fillStyle =
+        targetName === 'ocean'
+          ? `rgba(153, 246, 228, ${alpha.toFixed(3)})`
+          : targetName === 'volcano'
+            ? `rgba(253, 186, 116, ${alpha.toFixed(3)})`
+            : targetName === 'ice'
+              ? `rgba(224, 242, 254, ${alpha.toFixed(3)})`
+              : `rgba(255, 248, 220, ${alpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(mx, my, mr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   return {
     setTheme,
+    setTimeOfDayMode,
+    getTimeOfDayMode,
     setWeather,
     getWeather,
     getThemeName,

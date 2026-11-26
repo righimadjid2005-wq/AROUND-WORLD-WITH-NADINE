@@ -138,21 +138,26 @@ export function computeDynamicCoopCamera({
   nadine,
   activeCharId = 'madjid',
   ghostState = null,
+  isWedding = false,
+  isBoss = false,
+  isCozyTogether = false,
 }) {
   const scaleY = viewH / worldH;
-  const scaleX = viewW / worldW;
   const isNarrow = viewW < 820;
 
+  // Base pixel scale always stays >= 1.0 so the world renders crisp & up-close
   const baseScale = isNarrow
-    ? Math.max(scaleX * 1.45, Math.min(scaleY * 0.72, 0.85))
-    : Math.min(Math.max(scaleX, scaleY * 0.88), scaleY * 1.04);
+    ? Math.max(1.0, Math.min(scaleY, viewW / 360))
+    : Math.max(1.0, Math.min(scaleY, 1.32));
 
   if (!madjid || !nadine) {
-    const visibleW = viewW / baseScale;
-    const visibleH = viewH / baseScale;
+    const zoomFactor = 1.26;
+    const scale = Math.max(1.2, baseScale * zoomFactor);
+    const visibleW = viewW / scale;
+    const visibleH = viewH / scale;
     return {
-      scale: baseScale,
-      zoomFactor: 1,
+      scale,
+      zoomFactor: scale / baseScale,
       visibleW,
       visibleH,
       maxCamX: Math.max(0, worldW - visibleW),
@@ -184,27 +189,21 @@ export function computeDynamicCoopCamera({
 
   const dx = Math.abs(mPos.x - nPos.x);
   const dy = Math.abs(mPos.y - nPos.y);
-
-  // Required span to keep both players comfortably framed with generous padding
-  const padX = isNarrow ? 200 : 280;
-  const padY = 190;
-  const neededW = dx + padX;
-  const neededH = dy + padY;
-
-  const baseVisW = viewW / baseScale;
-  const baseVisH = viewH / baseScale;
-
   const sepDist = Math.hypot(dx, dy);
-  let zoomFactor = 1;
-  if (sepDist > 140) {
-    zoomFactor = clamp(1 - ((sepDist - 140) / 1400) * 0.24, 0.72, 1);
-  }
-  if (neededW > baseVisW || neededH > baseVisH) {
-    const fitScale = Math.min(viewW / neededW, viewH / neededH);
-    zoomFactor = Math.min(zoomFactor, clamp(fitScale / baseScale, 0.42, 1));
+
+  // Explicitly zoom IN (1.20x-1.35x) closer to Madjid and Nadine; NEVER zoom out (< 1.0)
+  let zoomFactor = 1.26;
+  if (isWedding && sepDist < 220) {
+    zoomFactor = 1.35;
+  } else if (isCozyTogether && sepDist < 120) {
+    zoomFactor = 1.32;
+  } else if (isBoss && !isWedding) {
+    zoomFactor = 1.2;
+  } else if (sepDist > 160) {
+    zoomFactor = clamp(1.26 - ((sepDist - 160) / 1600) * 0.06, 1.2, 1.26);
   }
 
-  const scale = Math.max(scaleX, baseScale * zoomFactor);
+  const scale = Math.max(1.2, baseScale * zoomFactor);
   const visibleW = viewW / scale;
   const visibleH = viewH / scale;
 
@@ -212,10 +211,18 @@ export function computeDynamicCoopCamera({
   const midX = (mPos.x + nPos.x) * 0.5;
   const midY = (mPos.y + nPos.y) * 0.5;
 
-  // Blend focus between active player (when close) and midpoint (as they spread apart)
-  const sepRatio = clamp(Math.hypot(dx, dy) / 280, 0, 1);
-  const focusX = activeActor.x * (1 - sepRatio * 0.85) + midX * (sepRatio * 0.85);
-  const focusY = activeActor.y * (1 - sepRatio * 0.85) + midY * (sepRatio * 0.85);
+  // Blend smoothly toward midpoint while keeping active character cleanly within safe sightlines
+  const sepRatio = isWedding ? 1 : clamp(sepDist / 260, 0, 1);
+  const rawFocusX = activeActor.x * (1 - sepRatio * 0.55) + midX * (sepRatio * 0.55);
+  const rawFocusY = activeActor.y * (1 - sepRatio * 0.55) + midY * (sepRatio * 0.55);
+  const maxMidShiftX = Math.max(0, visibleW * 0.28);
+  const maxMidShiftY = Math.max(0, visibleH * 0.22);
+  const focusX = isWedding
+    ? midX
+    : clamp(rawFocusX, activeActor.x - maxMidShiftX, activeActor.x + maxMidShiftX);
+  const focusY = isWedding
+    ? midY
+    : clamp(rawFocusY, activeActor.y - maxMidShiftY, activeActor.y + maxMidShiftY);
 
   return {
     scale,
@@ -235,7 +242,13 @@ export function computeDynamicCoopCamera({
 
 export function canCarryPartner(mechState, levelState, carrierId) {
   if (!mechState || !levelState || levelState.completed) return false;
-  if (mechState.ghost.active && (mechState.ghost.phase === 'shock' || mechState.ghost.phase === 'devour_fly' || mechState.ghost.phase === 'slap_run')) {
+  if (
+    mechState.ghost.active &&
+    (mechState.ghost.phase === 'shock' ||
+      mechState.ghost.phase === 'devour_fly' ||
+      mechState.ghost.phase === 'phase_dash' ||
+      mechState.ghost.phase === 'slap_run')
+  ) {
     return false;
   }
   const carriedId = carrierId === 'madjid' ? 'nadine' : 'madjid';
@@ -243,6 +256,7 @@ export function canCarryPartner(mechState, levelState, carrierId) {
   const partner = levelState.actors[carriedId];
   if (!carrier || !partner) return false;
   if (carrier.hurtTimer > 0 || partner.hurtTimer > 0) return false;
+  if (carrier.carryingBlockId || partner.carryingBlockId) return false;
 
   if (mechState.carrying && mechState.carrying.carrierId === carrierId) {
     return true;
@@ -278,6 +292,9 @@ export function toggleCarry(mechState, levelState, carrierId) {
     return { ok: true, action: 'drop', carrierId, carriedId };
   }
 
+  if (carrier.carryingBlockId || partner.carryingBlockId) {
+    return { ok: false, reason: 'CARRYING_BLOCK' };
+  }
   if (!canCarryPartner(mechState, levelState, carrierId)) {
     return { ok: false, reason: 'TOO_FAR' };
   }
@@ -408,6 +425,98 @@ export function getGhostThresholds(worldWidth) {
   const warnDist = clamp(Math.round(worldWidth * 0.34), GHOST_CONFIG.WARN_MIN, GHOST_CONFIG.WARN_MAX);
   const spawnDist = clamp(Math.round(worldWidth * 0.46), GHOST_CONFIG.SPAWN_MIN, GHOST_CONFIG.SPAWN_MAX);
   return { warnDist, spawnDist };
+}
+
+/**
+ * Initiates an Ethereal Soul Dash / Phase-Warp on an actor so they glide cleanly
+ * directly through walls & obstacles straight to a target safe position.
+ */
+export function startPhaseDash(actor, targetX, targetY, reason = 'ghost', worldWidth = 2400) {
+  if (!actor) return null;
+  const safeTargetX = clamp(targetX, 8, Math.max(8, worldWidth - actor.w - 8));
+  const safeTargetY = Math.max(8, targetY);
+  const dist = Math.hypot(safeTargetX - actor.x, safeTargetY - actor.y);
+  const duration = clamp(dist / 860, 0.38, 0.92);
+  actor.vx = 0;
+  actor.vy = 0;
+  actor.grounded = false;
+  actor.ridingPlatformId = null;
+  actor.devouredByGhost = false;
+  actor.phaseDash = {
+    active: true,
+    startX: actor.x,
+    startY: actor.y,
+    targetX: safeTargetX,
+    targetY: safeTargetY,
+    elapsed: 0,
+    duration,
+    trail: [],
+    reason,
+  };
+  return actor.phaseDash;
+}
+
+/**
+ * Advances an active Ethereal Phase-Dash frame by frame (ignores terrain/walls).
+ * Returns true the frame the actor arrives and materializes with a glass ripple.
+ */
+export function stepPhaseDash(actor, dt) {
+  if (!actor || !actor.phaseDash || !actor.phaseDash.active) return false;
+  const pd = actor.phaseDash;
+  pd.elapsed += dt;
+  const u = clamp(pd.elapsed / Math.max(0.1, pd.duration), 0, 1);
+  // Smooth ease-in-out cubic curve
+  const ease = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+
+  const arcLift = Math.sin(u * Math.PI) * 34;
+  actor.x = pd.startX + (pd.targetX - pd.startX) * ease;
+  actor.y = pd.startY + (pd.targetY - pd.startY) * ease - arcLift;
+  actor.vx = 0;
+  actor.vy = 0;
+  actor.facing = pd.targetX >= pd.startX ? 1 : -1;
+
+  if (!Array.isArray(pd.trail)) pd.trail = [];
+  pd.trail.push({
+    x: actor.x + actor.w * 0.5,
+    y: actor.y + actor.h * 0.5,
+  });
+  if (pd.trail.length > 10) {
+    pd.trail.shift();
+  }
+
+  if (u >= 1) {
+    actor.x = pd.targetX;
+    actor.y = pd.targetY;
+    actor.vx = 0;
+    actor.vy = 0;
+    actor.phaseDash = null;
+    actor.phaseRippleTimer = 0.55;
+    actor.invulnTimer = Math.max(actor.invulnTimer || 0, 1.25);
+    actor.scaleX = 1.18;
+    actor.scaleY = 0.84;
+    actor.mood = 'happy';
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Banishes or knocks back the Ugly Ghost when struck by a player's equipped weapon.
+ */
+export function repelGhostWithWeapon(mechState, levelState) {
+  const g = mechState?.ghost;
+  if (!g || !g.active) return false;
+  const stray = levelState?.actors?.[g.strayId];
+  if (stray) {
+    stray.devouredByGhost = false;
+    stray.mood = 'happy';
+  }
+  g.active = false;
+  g.phase = 'idle';
+  g.warningActive = false;
+  g.cooldown = 4.2;
+  g.flashAlpha = 0.28;
+  return true;
 }
 
 export function stepGhostSystem(mechState, levelState, dt, options = {}, callbacks = {}) {
@@ -545,16 +654,20 @@ export function stepGhostSystem(mechState, levelState, dt, options = {}, callbac
 
     if (g.timer <= 0) {
       if (g.outcome === 'slap') {
-        // Outcome A: Ghost SLAPS the stray player's behind -> high-speed panic run back to partner!
-        g.phase = 'slap_run';
-        g.timer = GHOST_CONFIG.PANIC_MAX_TIME;
-        g.slapCalloutTimer = 1.2;
+        // Outcome A: Ethereal Soul Dash / Phase-Warp directly through obstacles straight to partner!
+        g.phase = 'phase_dash';
+        g.timer = 1.4;
+        g.slapCalloutTimer = 1.25;
         g.slapCalloutX = stray.x + stray.w * 0.5;
         g.slapCalloutY = stray.y - 12;
+        const targetX = clamp(
+          partner.x - (partner.facing || 1) * 32,
+          8,
+          levelState.worldWidth - stray.w - 8
+        );
+        const targetY = Math.max(8, partner.y);
         stray.mood = 'panic';
-        stray.scaleX = 1.24;
-        stray.scaleY = 0.78;
-        stray.vy = -195;
+        startPhaseDash(stray, targetX, targetY, 'ghost', levelState.worldWidth);
         callbacks.onGhostSlap?.(stray, partner, g);
       } else {
         // Outcome B: Ghost DEVOURS the stray player -> flies across screen to partner & drops bones!
@@ -577,43 +690,59 @@ export function stepGhostSystem(mechState, levelState, dt, options = {}, callbac
     };
   }
 
-  if (g.phase === 'slap_run') {
+  if (g.phase === 'phase_dash' || g.phase === 'slap_run') {
     g.timer -= dt;
-    const px = partner.x + partner.w * 0.5;
-    const sx = stray.x + stray.w * 0.5;
-    const toPartner = px - sx;
-    const dir = toPartner >= 0 ? 1 : -1;
-    stray.mood = 'panic';
-    stray.facing = dir;
-    stray.vx = dir * GHOST_CONFIG.PANIC_SPEED;
+    // Update phase target dynamically if partner stepped slightly forward
+    if (stray.phaseDash?.active) {
+      stray.phaseDash.targetX = clamp(
+        partner.x - (partner.facing || 1) * 32,
+        8,
+        levelState.worldWidth - stray.w - 8
+      );
+      stray.phaseDash.targetY = Math.max(8, partner.y);
+    } else {
+      startPhaseDash(
+        stray,
+        partner.x - (partner.facing || 1) * 32,
+        partner.y,
+        'ghost',
+        levelState.worldWidth
+      );
+    }
 
-    // Ghost floats menacingly close behind during the panic sprint
-    g.x += (sx - dir * 56 - g.x) * Math.min(1, dt * 10);
-    g.y += (stray.y + 4 - g.y) * Math.min(1, dt * 10);
+    const arrived = stepPhaseDash(stray, dt);
+    const sx = stray.x + stray.w * 0.5;
+    const sy = stray.y + stray.h * 0.5;
+    const dir = partner.x >= stray.x ? 1 : -1;
+    g.x += (sx - dir * 64 - g.x) * Math.min(1, dt * 8);
+    g.y += (sy - 14 - g.y) * Math.min(1, dt * 8);
     g.facing = dir;
 
-    const nowDist = Math.hypot(px - sx, partner.y - stray.y);
-    if (nowDist <= GHOST_CONFIG.REUNITE_RADIUS || Math.abs(toPartner) <= 44 || g.timer <= 0) {
+    if (arrived || g.timer <= 0) {
+      if (stray.phaseDash?.active) {
+        stray.x = clamp(partner.x - (partner.facing || 1) * 32, 8, levelState.worldWidth - stray.w - 8);
+        stray.y = Math.max(8, partner.y);
+        stray.phaseDash = null;
+        stray.phaseRippleTimer = 0.55;
+      }
       stray.mood = 'happy';
-      stray.invulnTimer = Math.max(stray.invulnTimer, 1.0);
+      stray.invulnTimer = Math.max(stray.invulnTimer, 1.2);
       stray.vx = 0;
       g.active = false;
       g.phase = 'idle';
       g.warningActive = false;
       g.cooldown = GHOST_CONFIG.COOLDOWN_AFTER_PENALTY;
-      callbacks.onGhostReunited?.(stray, partner, 'slap');
+      callbacks.onGhostReunited?.(stray, partner, 'phase_dash');
       return { overrideIntents: null };
     }
 
-    // Automatically run toward partner (and auto-hop small steps if blocked horizontally)
-    const blockedStep = Math.abs(stray.vx) < 10 && stray.grounded;
     return {
       overrideIntents: {
         [g.strayId]: {
-          left: dir < 0,
-          right: dir > 0,
-          jumpHeld: blockedStep,
-          jumpJustPressed: blockedStep,
+          left: false,
+          right: false,
+          jumpHeld: false,
+          jumpJustPressed: false,
           jumpJustReleased: false,
         },
       },

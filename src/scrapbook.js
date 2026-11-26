@@ -23,7 +23,7 @@ export function getPhotoSpotsForLevel(level) {
       x: spotX,
       y: groundY,
       title: `${level.worldName} Overlook`,
-      location: `${level.worldName} · Stage ${level.code}`,
+      location: `${level.worldName} · World ${level.worldId || level.code || 1}`,
     },
   ];
 }
@@ -212,6 +212,25 @@ export function renderPhotoSpots(ctx, spots, activeSpot, time) {
   }
 }
 
+export function triggerPhotoDownload(photo) {
+  if (!photo || !photo.imageDataUrl || typeof document === 'undefined') return false;
+  try {
+    const a = document.createElement('a');
+    a.href = photo.imageDataUrl;
+    const safeTitle = String(photo.title || 'nadine-memory')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    a.download = `${safeTitle || 'memory'}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function renderScrapbookGrid(containerEl, countEl, photos, { onDelete } = {}) {
   if (countEl) {
     countEl.textContent = `${photos.length} Memor${photos.length === 1 ? 'y' : 'ies'} Saved`;
@@ -259,13 +278,29 @@ export function renderScrapbookGrid(containerEl, countEl, photos, { onDelete } =
     body.appendChild(title);
     body.appendChild(meta);
 
+    const actions = document.createElement('div');
+    actions.className = 'scrapbook-card-actions';
+
+    if (photo.imageDataUrl) {
+      const dl = document.createElement('button');
+      dl.type = 'button';
+      dl.className = 'scrapbook-dl-btn';
+      dl.textContent = 'Download';
+      dl.addEventListener('click', () => triggerPhotoDownload(photo));
+      actions.appendChild(dl);
+    }
+
     if (typeof onDelete === 'function') {
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'scrapbook-del-btn';
       del.textContent = 'Remove';
       del.addEventListener('click', () => onDelete(photo.id));
-      body.appendChild(del);
+      actions.appendChild(del);
+    }
+
+    if (actions.children.length > 0) {
+      body.appendChild(actions);
     }
 
     card.appendChild(body);

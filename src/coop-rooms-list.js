@@ -10,15 +10,34 @@
  * @param {{ mode?: string, levelIndex?: number }} room
  * @returns {string}
  */
+const WORLD_LABELS = ['Jungle', 'Ice Lands', 'Volcano', 'Space', 'Ocean World'];
+
 export function formatRoomModeLabel(room) {
-  if (!room) return 'Story W1-1';
+  if (!room) return 'Story W1 · Jungle';
   if (room.mode === 'openworld') {
     return '2D Open-World';
   }
   const idx = Number.isInteger(room.levelIndex) ? Math.max(0, room.levelIndex) : 0;
-  const worldNum = Math.floor(idx / 5) + 1;
-  const stageNum = (idx % 5) + 1;
-  return `Story W${worldNum}-${stageNum}`;
+  const worldNum = idx + 1;
+  const label = WORLD_LABELS[idx] || `World ${worldNum}`;
+  return `Story W${worldNum} · ${label}`;
+}
+
+/**
+ * Finds the first available open room (prefers live 1/2 sessions waiting for a partner,
+ * then falls back to saved 0/2 rooms). Returns null if all rooms are full or none exist.
+ * @param {Array<object>} rooms
+ * @returns {object | null}
+ */
+export function findFirstOpenRoom(rooms) {
+  const list = Array.isArray(rooms) ? rooms : [];
+  const isOpen = (r) => {
+    if (!r || !r.code) return false;
+    const maxP = Number(r.maxPlayers) || 2;
+    const count = Number.isFinite(r.playerCount) ? r.playerCount : 0;
+    return !r.isFull && count < maxP;
+  };
+  return list.find((r) => isOpen(r) && (r.playerCount || 0) > 0) || list.find(isOpen) || null;
 }
 
 /**
@@ -45,12 +64,13 @@ export function renderCoopRoomsListComponent(containerEl, rooms, { isConnected, 
 
   list.forEach((room) => {
     const maxPlayers = room.maxPlayers || 2;
-    const playerCount = Number.isFinite(room.playerCount) ? room.playerCount : 1;
+    const playerCount = Number.isFinite(room.playerCount) ? room.playerCount : 0;
     const isFull = Boolean(room.isFull || playerCount >= maxPlayers);
+    const isSavedOffline = playerCount === 0;
     const modeLabel = formatRoomModeLabel(room);
 
     const card = document.createElement('div');
-    card.className = `coop-room-card${isFull ? ' is-full' : ''}`;
+    card.className = `coop-room-card${isFull ? ' is-full' : isSavedOffline ? ' is-saved' : ''}`;
     card.setAttribute('role', 'listitem');
     card.dataset.roomCode = room.code;
     card.dataset.roomMode = room.mode === 'openworld' ? 'openworld' : 'story';
@@ -76,8 +96,12 @@ export function renderCoopRoomsListComponent(containerEl, rooms, { isConnected, 
     modeBadge.textContent = modeLabel;
 
     const countBadge = document.createElement('span');
-    countBadge.className = `coop-badge coop-badge-count tabular-nums${isFull ? ' is-full' : ''}`;
-    countBadge.textContent = `${playerCount}/${maxPlayers} Players`;
+    countBadge.className = `coop-badge coop-badge-count tabular-nums${
+      isFull ? ' is-full' : isSavedOffline ? ' is-saved' : ''
+    }`;
+    countBadge.textContent = isSavedOffline
+      ? `Saved (${playerCount}/${maxPlayers})`
+      : `${playerCount}/${maxPlayers} Players`;
 
     badgesRow.appendChild(codeBadge);
     badgesRow.appendChild(modeBadge);
@@ -90,12 +114,12 @@ export function renderCoopRoomsListComponent(containerEl, rooms, { isConnected, 
     joinBtn.type = 'button';
     joinBtn.className = `coop-mini-btn coop-room-join-btn${isFull ? '' : ' coop-mini-gold'}`;
     joinBtn.disabled = isFull;
-    joinBtn.textContent = isFull ? 'Full (2/2)' : 'Join';
+    joinBtn.textContent = isFull ? 'Full (2/2)' : isSavedOffline ? 'Rejoin' : 'Join';
     joinBtn.setAttribute(
       'aria-label',
       isFull
         ? `Room ${room.code} is full (${playerCount} of ${maxPlayers} players)`
-        : `Join room ${room.name} (${room.code}, ${modeLabel}, ${playerCount} of ${maxPlayers} players)`
+        : `${isSavedOffline ? 'Rejoin saved' : 'Join'} room ${room.name} (${room.code}, ${modeLabel}, ${playerCount} of ${maxPlayers} players)`
     );
     joinBtn.addEventListener('click', () => {
       onJoinRoom?.(room);

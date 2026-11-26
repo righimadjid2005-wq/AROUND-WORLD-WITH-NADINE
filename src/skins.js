@@ -5,6 +5,9 @@
  * Supports expressive moods: 'normal', 'happy', 'kissing', 'crying', 'worried'.
  */
 
+import { drawWeaponInHand } from './weapons.js';
+import { drawCustomSkinOverlay } from './skin-studio.js';
+
 const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
 
 function drawTravelScarfBack(ctx, state) {
@@ -381,6 +384,226 @@ function drawBridalCrownFront(ctx, state) {
   ctx.restore();
 }
 
+function drawWardenCapeBack(ctx, state) {
+  const { palette, time, vx, vy, facing } = state;
+  const dir = -facing;
+  const wave = Math.sin(time * 7 + Math.abs(vx) * 0.02) * 3.2;
+  const dragX = clamp(-vx * 0.05, -12, 12);
+  const dragY = clamp(-vy * 0.02, -5, 6);
+  ctx.save();
+  ctx.fillStyle = palette.accent;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(dir * 7, -4);
+  ctx.quadraticCurveTo(dir * 20 + dragX * 0.6, 5 + wave * 0.5, dir * 22 + dragX, 17 + wave + dragY);
+  ctx.lineTo(dir * 5 + dragX * 0.3, 18 + dragY * 0.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawWardenCrestFront(ctx, state) {
+  const { palette, facing } = state;
+  ctx.save();
+  ctx.translate(facing * 1, -17);
+  ctx.fillStyle = palette.accentAlt;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.7;
+  ctx.beginPath();
+  ctx.moveTo(0, -6);
+  ctx.lineTo(5, 1);
+  ctx.lineTo(0, 4);
+  ctx.lineTo(-5, 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawClockworkCogFront(ctx, state) {
+  const { palette, time, facing } = state;
+  ctx.save();
+  ctx.translate(facing * -8, -13.5);
+  ctx.rotate(time * 1.4);
+  ctx.fillStyle = palette.accentAlt;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  for (let i = 0; i < 12; i++) {
+    const r = i % 2 === 0 ? 6.2 : 4.2;
+    const a = (i * Math.PI) / 6;
+    const px = Math.cos(a) * r;
+    const py = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = palette.accent;
+  ctx.beginPath();
+  ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFrostEarmuffsFront(ctx, state) {
+  const { palette } = state;
+  ctx.save();
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 2.1;
+  ctx.beginPath();
+  ctx.arc(0, -3, 16.5, Math.PI * 1.15, Math.PI * 1.85);
+  ctx.stroke();
+  [-15.5, 15.5].forEach((mx) => {
+    ctx.fillStyle = palette.accentAlt;
+    ctx.beginPath();
+    ctx.arc(mx, -2, 4.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function drawFoxEarsFront(ctx, state) {
+  const { palette } = state;
+  ctx.save();
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.8;
+  [-1, 1].forEach((s) => {
+    ctx.fillStyle = palette.body;
+    ctx.beginPath();
+    ctx.moveTo(s * 5, -14);
+    ctx.lineTo(s * 12, -23);
+    ctx.lineTo(s * 14, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = palette.belly;
+    ctx.beginPath();
+    ctx.moveTo(s * 7, -14);
+    ctx.lineTo(s * 11, -20);
+    ctx.lineTo(s * 12, -11.5);
+    ctx.closePath();
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawSolarHaloFront(ctx, state) {
+  const { palette, time } = state;
+  const floatY = Math.sin(time * 4) * 1.4;
+  ctx.save();
+  ctx.translate(0, -22 + floatY);
+  ctx.strokeStyle = palette.accentAlt;
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 10.5, 3.2, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawMoonWitchHatFront(ctx, state) {
+  const { palette, facing } = state;
+  ctx.save();
+  ctx.translate(0, -14);
+  ctx.rotate(facing * -0.08);
+  ctx.fillStyle = palette.accent;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.9;
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 16, 4.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-9, 1);
+  ctx.quadraticCurveTo(-2, -16, 6, -15);
+  ctx.lineTo(9, 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = palette.accentAlt;
+  ctx.beginPath();
+  ctx.arc(facing * 2, -5, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFairyWingsBack(ctx, state) {
+  const { palette, time, facing } = state;
+  const flap = Math.sin(time * 12) * 0.25;
+  const dir = -facing;
+  ctx.save();
+  ctx.translate(dir * 7, -2);
+  ctx.fillStyle = 'rgba(217, 255, 236, 0.72)';
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.6;
+  ctx.save();
+  ctx.rotate(dir * (0.35 + flap));
+  ctx.beginPath();
+  ctx.ellipse(dir * 10, -5, 11, 5.5, dir * -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+  ctx.save();
+  ctx.rotate(dir * (-0.15 - flap * 0.7));
+  ctx.beginPath();
+  ctx.ellipse(dir * 8, 5, 8.5, 4.2, dir * 0.25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawHoneyBeretFront(ctx, state) {
+  const { palette, facing } = state;
+  ctx.save();
+  ctx.translate(facing * -2, -16);
+  ctx.rotate(facing * -0.18);
+  ctx.fillStyle = palette.accent;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 11.5, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = palette.accentAlt;
+  ctx.beginPath();
+  ctx.arc(0, -4.5, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawAuroraTiaraFront(ctx, state) {
+  const { palette } = state;
+  ctx.save();
+  ctx.translate(0, -16);
+  ctx.fillStyle = palette.accentAlt;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-9, 2);
+  ctx.lineTo(-5, -5);
+  ctx.lineTo(0, -8);
+  ctx.lineTo(5, -5);
+  ctx.lineTo(9, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#E0F2FE';
+  ctx.beginPath();
+  ctx.arc(0, -3.5, 2.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 /**
  * Modular skin registry.
  * Add new skins at runtime via registerSkin() without modifying physics or game code.
@@ -497,6 +720,116 @@ export const SKINS = {
       drawBack: null,
       drawFront: drawWeddingGroomFront,
     },
+    {
+      id: 'crimson-warden',
+      character: 'madjid',
+      name: 'Crimson Warden',
+      tagline: 'Scarlet cloak & shield crest',
+      palette: {
+        body: '#DC4C5E',
+        bodyDark: '#A82E3F',
+        belly: '#F9A8B4',
+        outline: '#381018',
+        highlight: 'rgba(255, 255, 255, 0.56)',
+        cheek: 'rgba(255, 160, 172, 0.55)',
+        spot: 'rgba(255, 240, 242, 0.28)',
+        accent: '#9E1F32',
+        accentAlt: '#FCD34D',
+        eyeWhite: '#FFFFFF',
+        pupil: '#240B10',
+        trail: '#F87171',
+      },
+      drawBack: drawWardenCapeBack,
+      drawFront: drawWardenCrestFront,
+    },
+    {
+      id: 'clockwork-sage',
+      character: 'madjid',
+      name: 'Clockwork Sage',
+      tagline: 'Bronze teal & spinning brass cog',
+      palette: {
+        body: '#3B9CA8',
+        bodyDark: '#26727D',
+        belly: '#99E2EA',
+        outline: '#142F36',
+        highlight: 'rgba(255, 255, 255, 0.56)',
+        cheek: 'rgba(244, 134, 146, 0.52)',
+        spot: 'rgba(255, 252, 232, 0.3)',
+        accent: '#784F2A',
+        accentAlt: '#FBBF24',
+        eyeWhite: '#FFFFFF',
+        pupil: '#11252B',
+        trail: '#67E8F9',
+      },
+      drawBack: null,
+      drawFront: drawClockworkCogFront,
+    },
+    {
+      id: 'frost-drifter',
+      character: 'madjid',
+      name: 'Frost Drifter',
+      tagline: 'Glacier cyan & cozy earmuffs',
+      palette: {
+        body: '#67C3F3',
+        bodyDark: '#3A94CB',
+        belly: '#D4F1FF',
+        outline: '#16354D',
+        highlight: 'rgba(255, 255, 255, 0.66)',
+        cheek: 'rgba(255, 132, 152, 0.54)',
+        spot: 'rgba(255, 255, 255, 0.42)',
+        accent: '#38BDF8',
+        accentAlt: '#F8FAFC',
+        eyeWhite: '#FFFFFF',
+        pupil: '#13283B',
+        trail: '#BAE6FD',
+      },
+      drawBack: drawTravelScarfBack,
+      drawFront: drawFrostEarmuffsFront,
+    },
+    {
+      id: 'fox-ranger',
+      character: 'madjid',
+      name: 'Fox Ranger',
+      tagline: 'Autumn russet & woodland ears',
+      palette: {
+        body: '#EA7B3C',
+        bodyDark: '#C2581E',
+        belly: '#FFE4C7',
+        outline: '#3D1E0C',
+        highlight: 'rgba(255, 255, 255, 0.54)',
+        cheek: 'rgba(255, 118, 118, 0.52)',
+        spot: 'rgba(255, 245, 232, 0.32)',
+        accent: '#65A30D',
+        accentAlt: '#FDE047',
+        eyeWhite: '#FFFFFF',
+        pupil: '#291408',
+        trail: '#FDBA74',
+      },
+      drawBack: drawWardenCapeBack,
+      drawFront: drawFoxEarsFront,
+    },
+    {
+      id: 'solar-paladin',
+      character: 'madjid',
+      name: 'Solar Paladin',
+      tagline: 'Radiant gold & floating halo',
+      palette: {
+        body: '#F59E0B',
+        bodyDark: '#C27406',
+        belly: '#FEF08A',
+        outline: '#422505',
+        highlight: 'rgba(255, 255, 255, 0.62)',
+        cheek: 'rgba(255, 120, 128, 0.5)',
+        spot: 'rgba(255, 255, 240, 0.38)',
+        accent: '#EA580C',
+        accentAlt: '#FDE047',
+        eyeWhite: '#FFFFFF',
+        pupil: '#2B1804',
+        trail: '#FCD34D',
+      },
+      drawBack: drawWardenCapeBack,
+      drawFront: drawSolarHaloFront,
+    },
   ],
   nadine: [
     {
@@ -609,6 +942,116 @@ export const SKINS = {
       drawBack: drawBridalVeilBack,
       drawFront: drawBridalCrownFront,
     },
+    {
+      id: 'sakura-kitsune',
+      character: 'nadine',
+      name: 'Sakura Kitsune',
+      tagline: 'Cherry blossom & woodland ears',
+      palette: {
+        body: '#F792B8',
+        bodyDark: '#D46690',
+        belly: '#FFE4EE',
+        outline: '#4A1D30',
+        highlight: 'rgba(255, 255, 255, 0.64)',
+        cheek: 'rgba(255, 92, 134, 0.55)',
+        spot: 'rgba(255, 248, 252, 0.38)',
+        accent: '#FBCFE8',
+        accentAlt: '#FDE047',
+        eyeWhite: '#FFFFFF',
+        pupil: '#2E111E',
+        trail: '#F9A8D4',
+      },
+      drawBack: drawTwilightRibbonBack,
+      drawFront: drawFoxEarsFront,
+    },
+    {
+      id: 'moon-witch',
+      character: 'nadine',
+      name: 'Moon Witch',
+      tagline: 'Starlit plum & pointed hat',
+      palette: {
+        body: '#7E64D9',
+        bodyDark: '#5942AE',
+        belly: '#CABCF7',
+        outline: '#211645',
+        highlight: 'rgba(255, 255, 255, 0.56)',
+        cheek: 'rgba(244, 114, 182, 0.52)',
+        spot: 'rgba(255, 250, 224, 0.32)',
+        accent: '#31235E',
+        accentAlt: '#FDE047',
+        eyeWhite: '#FFFFFF',
+        pupil: '#181036',
+        trail: '#A78BFA',
+      },
+      drawBack: drawWardenCapeBack,
+      drawFront: drawMoonWitchHatFront,
+    },
+    {
+      id: 'emerald-wings',
+      character: 'nadine',
+      name: 'Emerald Sylph',
+      tagline: 'Jade shimmer & fluttering wings',
+      palette: {
+        body: '#47C98F',
+        bodyDark: '#2B9D6B',
+        belly: '#B7F7D8',
+        outline: '#123D2B',
+        highlight: 'rgba(255, 255, 255, 0.62)',
+        cheek: 'rgba(255, 128, 152, 0.52)',
+        spot: 'rgba(255, 255, 255, 0.36)',
+        accent: '#A7F3D0',
+        accentAlt: '#FEF08A',
+        eyeWhite: '#FFFFFF',
+        pupil: '#0F2E20',
+        trail: '#6EE7B7',
+      },
+      drawBack: drawFairyWingsBack,
+      drawFront: drawDaisyFlowerFront,
+    },
+    {
+      id: 'honey-sprout',
+      character: 'nadine',
+      name: 'Honey Beret',
+      tagline: 'Warm nectar & crimson beret',
+      palette: {
+        body: '#F6B142',
+        bodyDark: '#D18A1F',
+        belly: '#FFE8AD',
+        outline: '#4A2C0A',
+        highlight: 'rgba(255, 255, 255, 0.6)',
+        cheek: 'rgba(244, 102, 118, 0.52)',
+        spot: 'rgba(255, 250, 232, 0.36)',
+        accent: '#E11D48',
+        accentAlt: '#FEF08A',
+        eyeWhite: '#FFFFFF',
+        pupil: '#331D06',
+        trail: '#FCD34D',
+      },
+      drawBack: null,
+      drawFront: drawHoneyBeretFront,
+    },
+    {
+      id: 'aurora-empress',
+      character: 'nadine',
+      name: 'Aurora Empress',
+      tagline: 'Iridescent teal & crystal tiara',
+      palette: {
+        body: '#55B9DF',
+        bodyDark: '#368EB3',
+        belly: '#CCF2FF',
+        outline: '#133245',
+        highlight: 'rgba(255, 255, 255, 0.68)',
+        cheek: 'rgba(244, 114, 182, 0.52)',
+        spot: 'rgba(255, 255, 255, 0.42)',
+        accent: '#A5F3FC',
+        accentAlt: '#FDE68A',
+        eyeWhite: '#FFFFFF',
+        pupil: '#0E2433',
+        trail: '#7DD3FC',
+      },
+      drawBack: drawBridalVeilBack,
+      drawFront: drawAuroraTiaraFront,
+    },
   ],
 };
 
@@ -652,7 +1095,26 @@ export function registerSkin(skinDef) {
  */
 export function renderCharacter(ctx, actor, skin, time, options = {}) {
   const { isActive = false, partnerPos = null, showIndicator = true } = options;
-  const palette = skin.palette;
+  const palette = {
+    belly: '#F5F7FF',
+    highlight: skin.palette?.shine || 'rgba(255, 255, 255, 0.6)',
+    cheek: skin.palette?.blush || 'rgba(255, 114, 146, 0.5)',
+    spot: 'rgba(255, 255, 255, 0.25)',
+    accent: '#FDE047',
+    accentAlt: '#FBBF24',
+    eyeWhite: '#FFFFFF',
+    pupil: '#1C223B',
+    ...skin.palette,
+  };
+
+  const hp = typeof actor.hp === 'number' ? actor.hp : 100;
+  const maxHp = typeof actor.maxHp === 'number' ? Math.max(1, actor.maxHp) : 100;
+  const hpRatio = hp / maxHp;
+  const hasScratches = hp > 0 && hp < 75;
+  const isWincingLowHp = hp > 0 && hpRatio < 0.3;
+  const isSpaceSwim = actor.physicsMode === 'space_swim';
+  const isSwimming =
+    actor.physicsMode === 'underwater' || isSpaceSwim || actor.physicsMode === 'low_grav';
 
   const isCrying = (actor.hurtTimer ?? 0) > 0;
   const isShocked = actor.mood === 'shocked';
@@ -660,12 +1122,77 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
   const isCarried = Boolean(actor.carriedBy);
   const isKissing = actor.mood === 'kissing';
   const isBlushing = (actor.blushTimer ?? 0) > 0;
-  const isWorried = actor.mood === 'worried' && !isCrying && !isShocked;
-  const isHappy = !!actor.inPortal || actor.mood === 'happy' || isBlushing || Boolean(actor.danceStyle);
+  const isWorried = (actor.mood === 'worried' || isWincingLowHp) && !isCrying && !isShocked;
+  const isHappy =
+    !isWincingLowHp &&
+    (!!actor.inPortal || actor.mood === 'happy' || isBlushing || Boolean(actor.danceStyle));
   const invulnFlash = (actor.invulnTimer ?? 0) > 0 && Math.floor(time * 16) % 2 === 0;
 
   const cx = actor.x + actor.w * 0.5;
   const bottomY = actor.y + actor.h;
+
+  // Ethereal Soul Dash / Phase-Warp form (glides cleanly through solid obstacles to partner/checkpoint)
+  if (actor.phaseDash?.active) {
+    ctx.save();
+    const trail = actor.phaseDash.trail || [];
+    for (let i = 0; i < trail.length; i++) {
+      const node = trail[i];
+      const frac = (i + 1) / Math.max(1, trail.length);
+      ctx.globalAlpha = frac * 0.45;
+      ctx.fillStyle = palette.trail || '#7DD3FC';
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, 6 + frac * 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const orbX = cx;
+    const orbY = bottomY - 18;
+    const pulse = 1 + Math.sin(time * 18) * 0.1;
+
+    const halo = ctx.createRadialGradient(orbX, orbY, 3, orbX, orbY, 26 * pulse);
+    halo.addColorStop(0, '#FFFFFF');
+    halo.addColorStop(0.35, palette.trail || '#7DD3FC');
+    halo.addColorStop(0.75, 'rgba(56, 189, 248, 0.32)');
+    halo.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(orbX, orbY, 26 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Translucent glass shell + sparkling core
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.46)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(orbX, orbY, 13 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = palette.body;
+    ctx.beginPath();
+    ctx.arc(orbX, orbY, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  // Soft liquid-glass arrival ripple ring when rematerializing after Phase-Dash
+  if ((actor.phaseRippleTimer ?? 0) > 0) {
+    const p = 1 - Math.max(0, Math.min(1, actor.phaseRippleTimer / 0.55));
+    ctx.save();
+    ctx.strokeStyle = `rgba(186, 230, 253, ${((1 - p) * 0.85).toFixed(3)})`;
+    ctx.lineWidth = 2.6 * (1 - p * 0.5);
+    ctx.beginPath();
+    ctx.arc(cx, bottomY - 18, 16 + p * 34, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255, 255, 255, ${((1 - p) * 0.65).toFixed(3)})`;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(cx, bottomY - 18, 10 + p * 22, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   const idleBreath =
     actor.grounded && Math.abs(actor.vx || 0) < 12 && !isCrying && !isShocked
       ? Math.sin(time * 3.4 + (actor.id === 'nadine' ? 1.4 : 0))
@@ -720,13 +1247,18 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
     }
   }
 
-  const sx = (actor.scaleX ?? 1) * (1 + idleBreath * 0.025) * danceSx;
-  const sy = (actor.scaleY ?? 1) * (1 - idleBreath * 0.025) * danceSy;
+  const sx = (actor.scaleX ?? 1) * (1 + idleBreath * 0.025) * danceSx * (isWincingLowHp ? 1.03 : 1);
+  const sy = (actor.scaleY ?? 1) * (1 - idleBreath * 0.025) * danceSy * (isWincingLowHp ? 0.94 : 1);
 
   const walkPhase = (actor.walkDist ?? 0) * 0.14;
   const moving = Math.abs(actor.vx || 0) > 15 && actor.grounded && !isCrying;
   const hopBob = moving ? Math.abs(Math.sin(walkPhase)) * 2.4 : 0;
-  const kissLeanAngle = (actor.kissLean ?? 0) + danceRot;
+  const lowHpHunchTilt = isWincingLowHp && !actor.danceStyle ? (actor.facing || 1) * 0.1 + Math.sin(time * 9) * 0.03 : 0;
+  const swimTilt =
+    isSwimming && !actor.grounded && !actor.danceStyle && !isCrying
+      ? clamp((actor.vx || 0) * 0.0012 + (actor.vy || 0) * 0.0007 * (actor.facing || 1), -0.34, 0.34)
+      : 0;
+  const kissLeanAngle = (actor.kissLean ?? 0) + danceRot + lowHpHunchTilt + swimTilt;
 
   ctx.save();
   if (invulnFlash) {
@@ -761,6 +1293,34 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
   // Move origin to body center (18px above feet)
   ctx.translate(0, -18);
 
+  // Protective stance aura (Madjid guarding when threats near or Nadine < 45% HP)
+  if (actor.protectiveStance && !actor.phaseDash?.active) {
+    const auraPulse = 0.72 + Math.sin(time * 6) * 0.14;
+    ctx.save();
+    ctx.strokeStyle = `rgba(125, 211, 252, ${auraPulse * 0.55})`;
+    ctx.lineWidth = 2.4;
+    const faceSign = actor.facing || 1;
+    ctx.beginPath();
+    ctx.arc(faceSign * 3, 0, 21.5, faceSign > 0 ? -Math.PI * 0.45 : Math.PI * 0.55, faceSign > 0 ? Math.PI * 0.45 : Math.PI * 1.45);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Graceful poise petals/sparkle aura (Nadine near photo spots / rune seals)
+  if (actor.gracefulPose && !actor.phaseDash?.active) {
+    ctx.save();
+    for (let sp = 0; sp < 4; sp++) {
+      const ang = time * 2.2 + sp * (Math.PI * 0.5);
+      const sxp = Math.cos(ang) * 21;
+      const syp = Math.sin(ang) * 14 - 4;
+      ctx.fillStyle = sp % 2 === 0 ? 'rgba(251, 207, 232, 0.88)' : 'rgba(253, 224, 71, 0.85)';
+      ctx.beginPath();
+      ctx.arc(sxp, syp, 2.2 + Math.sin(time * 7 + sp) * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   const renderState = {
     palette,
     time,
@@ -775,10 +1335,19 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
     skin.drawBack(ctx, renderState);
   }
 
-  // Tiny animated feet nubs synced to walk distance
-  const leftFootY = moving ? Math.max(0, Math.sin(walkPhase)) * -3.5 : 0;
-  const rightFootY = moving ? Math.max(0, Math.sin(walkPhase + Math.PI)) * -3.5 : 0;
-  const airTilt = !actor.grounded ? clamp((actor.vy || 0) * 0.008, -3, 3) : 0;
+  // Tiny animated feet nubs synced to walk or ladder climb distance
+  const climbPhase = actor.onLadder ? (actor.y || 0) * 0.14 : 0;
+  const leftFootY = actor.onLadder
+    ? Math.sin(climbPhase) * 3.8
+    : moving
+      ? Math.max(0, Math.sin(walkPhase)) * -3.5
+      : 0;
+  const rightFootY = actor.onLadder
+    ? -Math.sin(climbPhase) * 3.8
+    : moving
+      ? Math.max(0, Math.sin(walkPhase + Math.PI)) * -3.5
+      : 0;
+  const airTilt = !actor.grounded && !actor.onLadder ? clamp((actor.vy || 0) * 0.008, -3, 3) : 0;
 
   ctx.fillStyle = palette.bodyDark;
   ctx.strokeStyle = palette.outline;
@@ -836,6 +1405,48 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
   ctx.beginPath();
   ctx.ellipse(-6.5, -10.5, 5.2, 2.7, -0.42, 0, Math.PI * 2);
   ctx.fill();
+
+  // Subtle 2.5D sunlit top-left rim crescent + lower bounce highlight for depth
+  ctx.strokeStyle = 'rgba(255, 252, 240, 0.34)';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(0, -1, 14.5, Math.PI * 1.05, Math.PI * 1.62);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(186, 230, 253, 0.16)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(0, 1, 14.2, Math.PI * 0.12, Math.PI * 0.42);
+  ctx.stroke();
+
+  if (skin.isCustom) {
+    drawCustomSkinOverlay(ctx, { ...skin, headgear: 'none', aura: 'none' }, time);
+  }
+
+  // Visible battle scratches when HP drops below 75
+  if (hasScratches) {
+    ctx.strokeStyle = isWincingLowHp ? 'rgba(239, 68, 68, 0.85)' : 'rgba(185, 28, 28, 0.65)';
+    ctx.lineWidth = isWincingLowHp ? 1.8 : 1.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-9, -4);
+    ctx.lineTo(-4, 2);
+    ctx.moveTo(-6, -5);
+    ctx.lineTo(-2, 0);
+    if (isWincingLowHp) {
+      ctx.moveTo(5, 3);
+      ctx.lineTo(10, 9);
+      ctx.moveTo(8, 2);
+      ctx.lineTo(12, 7);
+    }
+    ctx.stroke();
+  }
+
+  // Brief red hurt tint flash upon taking combat damage
+  if ((actor.hurtFlashTimer ?? 0) > 0) {
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.42)';
+    ctx.fillRect(-18, -18, 36, 36);
+  }
   ctx.restore();
 
   // Crisp outer silhouette stroke
@@ -1015,24 +1626,138 @@ export function renderCharacter(ctx, actor, skin, time, options = {}) {
     ctx.stroke();
   }
 
-  // Cheerful waving arms during wave_arms / disco / celebrate dance styles
-  if (actor.danceStyle && (actor.danceStyle === 'wave_arms' || actor.danceStyle === 'disco' || actor.danceStyle === 'celebrate')) {
-    const wave = Math.sin(time * 11) * 5;
-    ctx.fillStyle = palette.body;
-    ctx.strokeStyle = palette.outline;
-    ctx.lineWidth = 1.9;
-    [-16, 16].forEach((ax, i) => {
-      const ay = actor.danceStyle === 'disco' ? (i === 0 ? -12 + wave : 2 - wave) : -9 + (i === 0 ? wave : -wave);
-      ctx.beginPath();
-      ctx.arc(ax, ay, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    });
+  // Articulated animated hands (always visible in idle, walk, jump, ladder climb, dance, and weapon swings)
+  const facingDir = actor.facing || 1;
+  const atk = actor.weaponAttack;
+  const isSwinging = Boolean(atk && atk.active);
+  const atkProgress = isSwinging ? 1 - atk.timer / Math.max(0.05, atk.duration) : 0;
+  const walkArm = moving ? Math.sin(walkPhase) * 4.2 : 0;
+  const idleArmY = Math.sin(time * 3.4 + (actor.id === 'nadine' ? 1.4 : 0)) * 1.1;
+  const jumpArmY = !actor.grounded ? clamp((actor.vy || 0) * 0.014, -7, 4) : 0;
+
+  let backHandX = -facingDir * 15.5 - walkArm * facingDir * 0.7;
+  let backHandY = 4 + idleArmY + jumpArmY;
+  let leadHandX = facingDir * 15.5 + walkArm * facingDir * 0.9;
+  let leadHandY = 4 - idleArmY + jumpArmY;
+
+  if (actor.onLadder) {
+    const climbStroke = Math.sin(climbPhase) * 5.8;
+    backHandX = -facingDir * 10.5;
+    leadHandX = facingDir * 10.5;
+    backHandY = -5.5 + climbStroke;
+    leadHandY = -5.5 - climbStroke;
+  } else if (actor.danceStyle) {
+    const wave = Math.sin(time * 11) * 5.2;
+    backHandX = -facingDir * 16.5;
+    leadHandX = facingDir * 16.5;
+    backHandY = actor.danceStyle === 'disco' ? -11 + wave : -6 + wave;
+    leadHandY = actor.danceStyle === 'disco' ? 1 - wave : -6 - wave;
+  } else if (isSwinging) {
+    leadHandX = facingDir * (14 + Math.sin(atkProgress * Math.PI) * 7.5);
+    leadHandY = -2 + (atkProgress - 0.35) * 9;
+  } else if (actor.carryingPartner) {
+    // Both articulated arms raised cleanly overhead holding partner
+    backHandX = -facingDir * 9.5;
+    leadHandX = facingDir * 9.5;
+    backHandY = -12.5;
+    leadHandY = -12.5;
+  } else if (isSwimming && !actor.grounded) {
+    // Rhythmic underwater breaststroke / paddle motion
+    const stroke = time * 6.5;
+    backHandX = -facingDir * (13 + Math.cos(stroke) * 4.5);
+    leadHandX = facingDir * (14 + Math.cos(stroke + Math.PI) * 4.5);
+    backHandY = 1 + Math.sin(stroke) * 5.5;
+    leadHandY = 1 + Math.sin(stroke + Math.PI) * 5.5;
+  } else if (isKissing) {
+    backHandX = -facingDir * 11;
+    leadHandX = facingDir * 13.5;
+    backHandY = 4.5;
+    leadHandY = 2.5;
   }
+
+  // Back hand
+  ctx.fillStyle = palette.bodyDark;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.9;
+  ctx.beginPath();
+  ctx.arc(backHandX, backHandY, 3.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 
   // Front accessories (scarf knot, bow, flower, goggles, hat, crown)
   if (typeof skin.drawFront === 'function') {
     skin.drawFront(ctx, renderState);
+  }
+  if (skin.isCustom) {
+    drawCustomSkinOverlay(ctx, { ...skin, pattern: 'solid' }, time);
+  }
+
+  // Lead hand + gripped collectible weapon (Crystal Sword / Star Wand / Plasma Hammer)
+  if (actor.equippedWeapon) {
+    drawWeaponInHand(ctx, actor, leadHandX, leadHandY, facingDir);
+  }
+  ctx.fillStyle = palette.body;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = 1.9;
+  ctx.beginPath();
+  ctx.arc(leadHandX, leadHandY, 3.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Wedding Ceremony attire accents (groom bowtie for Madjid, floral veil & bouquet glow for Nadine)
+  if (actor.weddingCeremony) {
+    ctx.save();
+    if (actor.id === 'madjid') {
+      // Crisp satin dark bowtie beneath chin + golden lapel flower
+      ctx.fillStyle = '#1E1B4B';
+      ctx.strokeStyle = '#FDE68A';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(faceShiftX - 1, 5.5);
+      ctx.lineTo(faceShiftX - 6.5, 2.5);
+      ctx.lineTo(faceShiftX - 6.5, 8.5);
+      ctx.closePath();
+      ctx.moveTo(faceShiftX + 1, 5.5);
+      ctx.lineTo(faceShiftX + 6.5, 2.5);
+      ctx.lineTo(faceShiftX + 6.5, 8.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#FBBF24';
+      ctx.beginPath();
+      ctx.arc(faceShiftX, 5.5, 2.1, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Delicate translucent bridal veil & coral blossom crown
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.62)';
+      ctx.strokeStyle = 'rgba(244, 114, 182, 0.82)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(-10, -16);
+      ctx.quadraticCurveTo(-20, -4, -18, 12);
+      ctx.quadraticCurveTo(-11, 14, -6, 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Floral bridal crown petals
+      [-5, 0, 5].forEach((fx, fi) => {
+        ctx.fillStyle = fi === 1 ? '#FDE047' : '#F472B6';
+        ctx.beginPath();
+        ctx.arc(fx, -17.5 + Math.abs(fx) * 0.15, 2.7, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+    ctx.restore();
+  }
+
+  // Translucent zero-G crystal helmet halo & jet sparkle in Space mode
+  if (isSpaceSwim && !actor.grounded) {
+    ctx.strokeStyle = 'rgba(125, 211, 252, 0.56)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, -1, 21.5, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   // Startled shock lightning sparks directly above head when shocked

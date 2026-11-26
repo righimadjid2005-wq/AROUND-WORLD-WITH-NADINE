@@ -200,6 +200,15 @@ export function createOpenWorldLevelDefinition(theme = 'sunrise') {
       { type: 'flowers', x: 1510, y: OPEN_WORLD_CONFIG.GROUND_Y },
       { type: 'lantern', x: 1960, y: OPEN_WORLD_CONFIG.GROUND_Y },
     ],
+    weapons: [
+      { id: 'ow_wp_sword', weaponId: 'crystal_sword', x: 340, y: 564 },
+      { id: 'ow_wp_wand', weaponId: 'star_wand', x: 610, y: 432 },
+      { id: 'ow_wp_hammer', weaponId: 'plasma_hammer', x: 1230, y: 416 },
+    ],
+    fragileBarriers: [
+      { id: 'ow_fb_1', x: 1460, y: 522, w: 28, h: 78, hp: 1 },
+      { id: 'ow_fb_2', x: 1860, y: 522, w: 28, h: 78, hp: 2 },
+    ],
     isOpenWorld: true,
   };
 }

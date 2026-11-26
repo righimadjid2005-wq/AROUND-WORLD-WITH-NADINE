@@ -24,14 +24,15 @@ function hash2d(a, b) {
 export function getBiomeSurfaceType(worldId, theme = 'sunrise') {
   switch (Number(worldId)) {
     case 1:
+      return 'jungle_ruins';
     case 2:
-      return 'meadow_turf';
+      return 'ice_frost';
     case 3:
-      return 'harbor_timber';
+      return 'volcano_obsidian';
     case 4:
-      return 'canyon_sandstone';
+      return 'space_hull';
     case 5:
-      return 'desert_dune';
+      return 'ocean_coral';
     case 6:
       return 'alpine_moss';
     case 7:
@@ -132,10 +133,10 @@ function getSurfacePattern(ctx, biome, bodyColor, trimColor, rimColor) {
       const sy = Math.floor(hash2d(s, 9) * size);
       tctx.fillRect(sx, sy, 2, 2);
     }
-  } else if (biome === 'crystal_geode') {
-    // Faceted dark mineral veins with subtle glowing crystal dust
-    tctx.strokeStyle = 'rgba(124, 196, 203, 0.11)';
-    tctx.lineWidth = 1.3;
+  } else if (biome === 'ice_frost' || biome === 'crystal_geode') {
+    // Faceted glacial ice / mineral veins with specular shards
+    tctx.strokeStyle = biome === 'ice_frost' ? 'rgba(224, 247, 255, 0.24)' : 'rgba(124, 196, 203, 0.11)';
+    tctx.lineWidth = 1.4;
     tctx.beginPath();
     tctx.moveTo(0, 26);
     tctx.lineTo(28, 12);
@@ -146,7 +147,7 @@ function getSurfacePattern(ctx, biome, bodyColor, trimColor, rimColor) {
     tctx.lineTo(82, 78);
     tctx.stroke();
 
-    tctx.fillStyle = 'rgba(124, 196, 203, 0.09)';
+    tctx.fillStyle = biome === 'ice_frost' ? 'rgba(255, 255, 255, 0.16)' : 'rgba(124, 196, 203, 0.09)';
     tctx.beginPath();
     tctx.moveTo(28, 12);
     tctx.lineTo(44, 24);
@@ -154,12 +155,59 @@ function getSurfacePattern(ctx, biome, bodyColor, trimColor, rimColor) {
     tctx.closePath();
     tctx.fill();
 
-    tctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
+    tctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
     for (let s = 0; s < 10; s++) {
       const sx = Math.floor(hash2d(s, 17) * size);
       const sy = Math.floor(hash2d(s, 23) * size);
       tctx.fillRect(sx, sy, 2, 2);
     }
+  } else if (biome === 'volcano_obsidian') {
+    // Cracked dark obsidian blocks with faint ember veins
+    tctx.strokeStyle = 'rgba(255, 107, 61, 0.2)';
+    tctx.lineWidth = 1.5;
+    tctx.beginPath();
+    tctx.moveTo(4, 14);
+    tctx.lineTo(36, 36);
+    tctx.lineTo(68, 22);
+    tctx.lineTo(94, 42);
+    tctx.moveTo(18, 86);
+    tctx.lineTo(52, 60);
+    tctx.lineTo(88, 82);
+    tctx.stroke();
+    tctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+    tctx.fillRect(10, 10, 32, 22);
+    tctx.fillRect(54, 48, 30, 26);
+  } else if (biome === 'space_hull') {
+    // Sleek modular starship bulkhead plating with neon conduit seam & rivets
+    tctx.strokeStyle = 'rgba(120, 220, 250, 0.16)';
+    tctx.lineWidth = 1.2;
+    tctx.strokeRect(4, 4, 42, 42);
+    tctx.strokeRect(50, 4, 42, 42);
+    tctx.strokeRect(4, 50, 88, 42);
+    tctx.fillStyle = 'rgba(186, 230, 253, 0.25)';
+    [
+      [9, 9],
+      [41, 9],
+      [55, 9],
+      [87, 9],
+      [9, 55],
+      [87, 55],
+    ].forEach(([rx, ry]) => {
+      tctx.fillRect(rx, ry, 2, 2);
+    });
+  } else if (biome === 'ocean_coral') {
+    // Sculpted reef limestone with faint shell swirls & seafoam speckles
+    tctx.fillStyle = 'rgba(110, 231, 212, 0.09)';
+    tctx.beginPath();
+    tctx.arc(24, 24, 14, 0, Math.PI * 2);
+    tctx.arc(72, 66, 16, 0, Math.PI * 2);
+    tctx.fill();
+    tctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    tctx.lineWidth = 1.2;
+    tctx.beginPath();
+    tctx.arc(24, 24, 9, 0.2, Math.PI * 1.5);
+    tctx.arc(72, 66, 10, 0.5, Math.PI * 1.7);
+    tctx.stroke();
   } else if (biome === 'summit_marble' || biome === 'moonlit_garden') {
     // Clean cut marble / temple ashlar blocks with hairline sunlit highlight edges
     const rows = 3;
@@ -250,8 +298,14 @@ function drawPlatformTopCap(ctx, p, style, biome) {
   ctx.roundRect(x, y, w, capH, [7, 7, 3, 3]);
   ctx.fill();
 
-  if (biome === 'meadow_turf' || biome === 'alpine_moss' || biome === 'moonlit_garden') {
-    // Organic scalloped moss overhangs along the cap bottom edge (stays cleanly within p.w)
+  if (
+    biome === 'meadow_turf' ||
+    biome === 'jungle_ruins' ||
+    biome === 'alpine_moss' ||
+    biome === 'moonlit_garden' ||
+    biome === 'ocean_coral'
+  ) {
+    // Organic scalloped moss/coral overhangs along the cap bottom edge (stays cleanly within p.w)
     ctx.fillStyle = style.top;
     const scallopStep = 18;
     for (let sx = x + 6; sx < x + w - 10; sx += scallopStep) {
@@ -266,8 +320,29 @@ function drawPlatformTopCap(ctx, p, style, biome) {
     ctx.beginPath();
     ctx.roundRect(x + 3, y + 1, Math.max(0, w - 6), 3.2, 2);
     ctx.fill();
-  } else if (biome === 'harbor_timber' || biome === 'cloud_pagoda') {
-    // Segmented wooden boardwalk planks / pagoda cornice with brass studs
+  } else if (biome === 'harbor_timber' || biome === 'space_hull') {
+    // Steel-riveted pier or starship deck cap
+    ctx.fillStyle = style.topRim;
+    ctx.beginPath();
+    ctx.roundRect(x + 2, y + 1, Math.max(0, w - 4), 3.2, 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(10, 14, 24, 0.48)';
+    ctx.lineWidth = 1.4;
+    const plankW = 28;
+    for (let bx = x + plankW; bx < x + w - 8; bx += plankW) {
+      ctx.beginPath();
+      ctx.moveTo(bx, y + 1);
+      ctx.lineTo(bx, y + capH);
+      ctx.stroke();
+
+      ctx.fillStyle = biome === 'space_hull' ? 'rgba(103, 232, 249, 0.72)' : 'rgba(147, 197, 253, 0.55)';
+      ctx.beginPath();
+      ctx.arc(bx - 5, y + capH * 0.56, 1.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (biome === 'cloud_pagoda') {
+    // Segmented pagoda cornice planks with brass studs
     ctx.fillStyle = style.topRim;
     ctx.fillRect(x + 2, y + 1, Math.max(0, w - 4), 2.8);
 
@@ -285,8 +360,8 @@ function drawPlatformTopCap(ctx, p, style, biome) {
       ctx.arc(bx - 5, y + capH * 0.55, 1.3, 0, Math.PI * 2);
       ctx.fill();
     }
-  } else if (biome === 'crystal_geode' || biome === 'summit_marble') {
-    // Sleek faceted crystal/marble bevel + diagonal specular catch
+  } else if (biome === 'ice_frost' || biome === 'crystal_geode' || biome === 'summit_marble') {
+    // Sleek faceted crystal/ice/marble bevel + diagonal specular catch
     ctx.fillStyle = style.topRim;
     ctx.beginPath();
     ctx.roundRect(x + 2, y + 1, Math.max(0, w - 4), 3.4, 2);
@@ -322,7 +397,14 @@ function drawPlatformTopCap(ctx, p, style, biome) {
 }
 
 function drawSurfaceTufts(ctx, p, style, biome) {
-  if (biome !== 'meadow_turf' && biome !== 'alpine_moss' && biome !== 'moonlit_garden') return;
+  if (
+    biome !== 'meadow_turf' &&
+    biome !== 'jungle_ruins' &&
+    biome !== 'alpine_moss' &&
+    biome !== 'moonlit_garden'
+  ) {
+    return;
+  }
   const x = p.x + 1;
   const w = Math.max(0, p.w - 2);
   if (w <= 28) return;
@@ -503,6 +585,28 @@ export function drawTerrainPlatform(ctx, p, style, worldId, theme, time, viewRan
   }
 
   drawPlatformTopCap(ctx, p, style, biome);
+
+  // Subtle 2.5D surface specular shimmer (especially crisp on ice, coral ocean, obsidian & starship decks)
+  if (p.w >= 48) {
+    const isShimmerBiome =
+      biome === 'ice_frost' ||
+      biome === 'ocean_coral' ||
+      biome === 'space_hull' ||
+      biome === 'volcano_obsidian';
+    const shimmerAlpha = isShimmerBiome ? 0.22 : 0.11;
+    const waveX = p.x + (((time * (isShimmerBiome ? 38 : 16) + p.x * 0.17) % Math.max(40, p.w)));
+    const streakW = Math.min(34, p.w * 0.25);
+    ctx.fillStyle =
+      biome === 'volcano_obsidian'
+        ? `rgba(255, 196, 120, ${shimmerAlpha})`
+        : biome === 'ocean_coral'
+          ? `rgba(153, 246, 228, ${shimmerAlpha})`
+          : `rgba(255, 255, 255, ${shimmerAlpha})`;
+    ctx.beginPath();
+    ctx.roundRect(waveX, p.y + 2, streakW, 2.5, 1.5);
+    ctx.fill();
+  }
+
   ctx.restore();
 
   // Re-stroke crisp outer border after clipped fills so edge contrast pops cleanly
@@ -514,6 +618,52 @@ export function drawTerrainPlatform(ctx, p, style, worldId, theme, time, viewRan
 
   drawSurfaceTufts(ctx, p, style, biome);
 
+  ctx.restore();
+}
+
+/**
+ * Draws an elevation-aware soft ground contact shadow directly below an entity
+ * projected onto the nearest solid platform beneath its feet (60fps zero-GC).
+ */
+export function drawActorContactShadow(ctx, entity, platforms, movingPlatforms = [], worldHeight = 720) {
+  if (!ctx || !entity || entity.devouredByGhost) return;
+  const cx = entity.x + entity.w * 0.5;
+  const footY = entity.y + entity.h;
+  let floorY = null;
+
+  if (Array.isArray(platforms)) {
+    for (let i = 0; i < platforms.length; i++) {
+      const p = platforms[i];
+      if (cx < p.x + 2 || cx > p.x + p.w - 2) continue;
+      if (p.y >= footY - 5 && (floorY === null || p.y < floorY)) {
+        floorY = p.y;
+      }
+    }
+  }
+  if (Array.isArray(movingPlatforms)) {
+    for (let i = 0; i < movingPlatforms.length; i++) {
+      const mp = movingPlatforms[i];
+      if (cx < mp.x + 2 || cx > mp.x + mp.w - 2) continue;
+      if (mp.y >= footY - 5 && (floorY === null || mp.y < floorY)) {
+        floorY = mp.y;
+      }
+    }
+  }
+  if (floorY === null || floorY > worldHeight + 40) return;
+
+  const heightAbove = Math.max(0, floorY - footY);
+  if (heightAbove > 165) return;
+
+  const t = 1 - heightAbove / 165;
+  const rx = (entity.w * 0.44) * (0.62 + t * 0.48);
+  const ry = Math.max(2, 4.4 * t);
+  const alpha = 0.28 * t * t;
+
+  ctx.save();
+  ctx.fillStyle = `rgba(10, 12, 26, ${alpha.toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(cx, floorY + 1.2, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -976,6 +1126,179 @@ export function drawHazardObstacle(ctx, hz, time, viewRange = null) {
       ctx.closePath();
       ctx.fill();
     }
+  } else if (hz.kind === 'lava') {
+    // Surging molten volcanic lava trough with glowing magma bubbles
+    const magmaGrad = ctx.createLinearGradient(hz.x, hz.y, hz.x, hz.y + hz.h);
+    magmaGrad.addColorStop(0, '#FACC15');
+    magmaGrad.addColorStop(0.45, '#F97316');
+    magmaGrad.addColorStop(1, '#991B1B');
+    ctx.fillStyle = magmaGrad;
+    ctx.strokeStyle = '#450A0A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(hz.x, hz.y, hz.w, hz.h, [6, 6, 2, 2]);
+    ctx.fill();
+    ctx.stroke();
+
+    // Animated surface magma crests
+    ctx.fillStyle = '#FEF08A';
+    for (let bx = hz.x + 8; bx < hz.x + hz.w - 8; bx += 18) {
+      const waveY = hz.y + 3 + Math.sin(time * 5 + bx * 0.1) * 1.8;
+      ctx.beginPath();
+      ctx.arc(bx, waveY, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (hz.kind === 'laser_beam') {
+    const period = hz.cyclePeriod || 3.0;
+    const phase = (((time + (hz.phase || 0)) % period) + period) % period;
+    const active = typeof hz.activeNow === 'boolean' ? hz.activeNow : phase < period * 0.56;
+    const warning = !active && phase >= period * 0.84;
+    const cx = hz.x + hz.w * 0.5;
+
+    // Top & bottom emitter pods
+    ctx.fillStyle = '#1E293B';
+    ctx.strokeStyle = active ? '#FCA5A5' : '#38BDF8';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.roundRect(hz.x - 2, hz.y, hz.w + 4, 12, 4);
+    ctx.roundRect(hz.x - 2, hz.y + hz.h - 12, hz.w + 4, 12, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    if (active) {
+      const flicker = 0.78 + Math.sin(time * 32 + hz.x) * 0.22;
+      ctx.fillStyle = `rgba(239, 68, 68, ${(0.32 * flicker).toFixed(2)})`;
+      ctx.fillRect(hz.x + 1, hz.y + 10, Math.max(4, hz.w - 2), hz.h - 20);
+
+      ctx.fillStyle = '#EF4444';
+      ctx.fillRect(cx - 4, hz.y + 10, 8, hz.h - 20);
+      ctx.fillStyle = '#FEF2F2';
+      ctx.fillRect(cx - 1.6, hz.y + 10, 3.2, hz.h - 20);
+    } else if (warning) {
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.78)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.moveTo(cx, hz.y + 12);
+      ctx.lineTo(cx, hz.y + hz.h - 12);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([4, 8]);
+      ctx.beginPath();
+      ctx.moveTo(cx, hz.y + 12);
+      ctx.lineTo(cx, hz.y + hz.h - 12);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  } else if (hz.kind === 'asteroid') {
+    const bob = Math.sin(time * 2.1 + hz.x * 0.03) * 2.2;
+    const cx = hz.x + hz.w * 0.5;
+    const cy = hz.y + hz.h * 0.5 + bob;
+    const rx = hz.w * 0.48;
+    const ry = hz.h * 0.46;
+
+    ctx.fillStyle = 'rgba(244, 63, 94, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx + 5, ry + 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#475569';
+    ctx.strokeStyle = '#FB7185';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - rx * 0.85, cy - ry * 0.25);
+    ctx.lineTo(cx - rx * 0.35, cy - ry * 0.92);
+    ctx.lineTo(cx + rx * 0.45, cy - ry * 0.82);
+    ctx.lineTo(cx + rx * 0.95, cy - ry * 0.1);
+    ctx.lineTo(cx + rx * 0.65, cy + ry * 0.82);
+    ctx.lineTo(cx - rx * 0.25, cy + ry * 0.94);
+    ctx.lineTo(cx - rx * 0.92, cy + ry * 0.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Craters
+    ctx.fillStyle = '#1E293B';
+    ctx.beginPath();
+    ctx.arc(cx - rx * 0.25, cy - ry * 0.15, 4.5, 0, Math.PI * 2);
+    ctx.arc(cx + rx * 0.28, cy + ry * 0.24, 3.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (hz.kind === 'icicle') {
+    ctx.fillStyle = '#1E3A5F';
+    ctx.fillRect(hz.x, hz.y, hz.w, 4);
+    for (let i = 0; i < count; i++) {
+      const bx = hz.x + i * step + step * 0.5;
+      ctx.fillStyle = i % 2 === 0 ? '#7DD3FC' : '#BAE6FD';
+      ctx.strokeStyle = '#0F2544';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(bx - step * 0.46, hz.y + 2);
+      ctx.lineTo(bx, hz.y + hz.h);
+      ctx.lineTo(bx + step * 0.46, hz.y + 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      ctx.beginPath();
+      ctx.moveTo(bx - step * 0.18, hz.y + 3);
+      ctx.lineTo(bx, hz.y + hz.h - 3);
+      ctx.lineTo(bx, hz.y + 3);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (hz.kind === 'jellyfish') {
+    const bob = Math.sin(time * 3.1 + hz.x * 0.05) * 2.5;
+    const cx = hz.x + hz.w * 0.5;
+    const bellY = hz.y + 14 + bob;
+    // Trailing glowing tentacles inside bounds
+    ctx.strokeStyle = 'rgba(244, 114, 182, 0.85)';
+    ctx.lineWidth = 2;
+    [-9, -3, 3, 9].forEach((tx, idx) => {
+      const wave = Math.sin(time * 6 + idx) * 2.8;
+      ctx.beginPath();
+      ctx.moveTo(cx + tx, bellY + 2);
+      ctx.quadraticCurveTo(cx + tx + wave, bellY + 14, cx + tx - wave * 0.6, hz.y + hz.h - 2);
+      ctx.stroke();
+    });
+    // Bioluminescent jellyfish dome
+    ctx.fillStyle = 'rgba(244, 114, 182, 0.78)';
+    ctx.strokeStyle = '#FDE047';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(cx, bellY, hz.w * 0.44, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.62)';
+    ctx.beginPath();
+    ctx.ellipse(cx - 4, bellY - 6, 4.5, 2.2, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (hz.kind === 'urchin') {
+    const cx = hz.x + hz.w * 0.5;
+    const cy = hz.y + hz.h - 4;
+    ctx.fillStyle = '#4C1D95';
+    ctx.strokeStyle = '#1E1B4B';
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i < count + 1; i++) {
+      const px = hz.x + 5 + (i / Math.max(1, count)) * Math.max(8, hz.w - 10);
+      const angle = -Math.PI + ((i + 0.5) / (count + 1)) * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(px - 3, cy);
+      ctx.lineTo(px + Math.cos(angle) * 5, hz.y);
+      ctx.lineTo(px + 3, cy);
+      ctx.closePath();
+      ctx.fillStyle = i % 2 === 0 ? '#7E22CE' : '#EC4899';
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#3B0764';
+    ctx.beginPath();
+    ctx.roundRect(cx - hz.w * 0.44, cy - 3, hz.w * 0.88, 6, 3);
+    ctx.fill();
   } else {
     // Forged steel-crimson spikes on hazard-striped iron anchor plate
     ctx.fillStyle = `rgba(239, 68, 68, ${(0.16 * dangerPulse).toFixed(2)})`;
@@ -1017,3 +1340,737 @@ export function drawHazardObstacle(ctx, hz, time, viewRange = null) {
   }
   ctx.restore();
 }
+
+/**
+ * Renders soft ambient contact shadows directly beneath elevated ledges and archways onto the ground plane.
+ */
+export function drawTerrainContactShadows(ctx, platforms = [], groundY = 600, viewRange = null) {
+  if (!Array.isArray(platforms) || platforms.length === 0) return;
+  ctx.save();
+  for (let i = 0; i < platforms.length; i++) {
+    const p = platforms[i];
+    if (p.kind === 'ground') continue;
+    if (!isRectVisible(p.x - 16, p.w + 32, viewRange)) continue;
+    const distY = groundY - (p.y + p.h);
+    if (distY < -4 || distY > 280) continue;
+    const fade = Math.max(0.08, 0.26 * (1 - Math.max(0, distY) / 300));
+    ctx.fillStyle = `rgba(10, 14, 28, ${fade.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      p.x + p.w * 0.5,
+      groundY + 3,
+      p.w * 0.46,
+      Math.max(4, 9 - distY * 0.015),
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * Renders carved mechanical Arrow / Bolt Trap totem with glowing telegraph sight cue.
+ */
+export function drawArrowTrap(ctx, trap, time, viewRange = null) {
+  if (!trap || !isRectVisible(trap.x - 24, 56, viewRange)) return;
+  const dir = trap.dir === 1 ? 1 : -1;
+  const w = trap.w || 32;
+  const h = trap.h || 38;
+  const isTelegraph = Boolean(trap.telegraph);
+  const pulse = isTelegraph ? 0.65 + Math.sin(time * 28) * 0.35 : 0;
+
+  ctx.save();
+  ctx.translate(trap.x, trap.y);
+
+  // Telegraph aim sight line before firing so players can jump cleanly
+  if (isTelegraph) {
+    const sightStart = dir === 1 ? w : 0;
+    ctx.strokeStyle = `rgba(248, 113, 113, ${(0.45 + pulse * 0.45).toFixed(2)})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 6]);
+    ctx.beginPath();
+    ctx.moveTo(sightStart, 14);
+    ctx.lineTo(sightStart + dir * 210, 14);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Carved stone/iron trap housing
+  ctx.fillStyle = trap.biome === 'ice' ? '#2B4C6F' : trap.biome === 'space' ? '#253659' : '#3C3246';
+  ctx.strokeStyle = '#140F20';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  // Top metallic bevel
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+  ctx.fillRect(3, 2, w - 6, 4);
+
+  // Firing nozzle aperture facing trap.dir
+  const nozzleX = dir === 1 ? w - 6 : -2;
+  ctx.fillStyle = '#181224';
+  ctx.strokeStyle = isTelegraph ? '#FCA5A5' : '#64748B';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.roundRect(nozzleX, 9, 8, 10, 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Glowing tension gem on front plate (turns bright crimson during telegraph)
+  ctx.fillStyle = isTelegraph ? '#EF4444' : '#F59E0B';
+  ctx.beginPath();
+  ctx.arc(w * 0.5, 14, isTelegraph ? 4.4 : 3.2, 0, Math.PI * 2);
+  ctx.fill();
+  if (isTelegraph) {
+    ctx.fillStyle = '#FEF2F2';
+    ctx.beginPath();
+    ctx.arc(w * 0.5, 14, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders fast flying arrow / bolt projectile with crisp directional trail.
+ */
+export function drawArrowProjectile(ctx, proj, _time, viewRange = null) {
+  if (!proj || !isRectVisible(proj.x - 28, 56, viewRange)) return;
+  const dir = proj.vx >= 0 ? 1 : -1;
+  ctx.save();
+  ctx.translate(proj.x, proj.y);
+  ctx.scale(dir, 1);
+
+  // Subtle air streak trail
+  ctx.strokeStyle = proj.biome === 'space' ? 'rgba(56, 189, 248, 0.5)' : 'rgba(254, 226, 226, 0.55)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-22, 0);
+  ctx.lineTo(-4, 0);
+  ctx.stroke();
+
+  // Arrow shaft
+  ctx.strokeStyle = '#1C1426';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(10, 0);
+  ctx.stroke();
+  ctx.strokeStyle = proj.biome === 'space' ? '#38BDF8' : '#E2E8F0';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(10, 0);
+  ctx.stroke();
+
+  // Razor arrowhead
+  ctx.fillStyle = '#F43F5E';
+  ctx.strokeStyle = '#181024';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(14, 0);
+  ctx.lineTo(5, -4.5);
+  ctx.lineTo(7, 0);
+  ctx.lineTo(5, 4.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Renders heavy carryable Relic Weight Block (used to weigh down Carry Pedestals).
+ */
+export function drawCarryBlock(ctx, block, time, viewRange = null) {
+  if (!block || !isRectVisible(block.x - 8, block.w + 16, viewRange)) return;
+  const cx = block.x + block.w * 0.5;
+  const cy = block.y + block.h * 0.5;
+  const isPlaced = Boolean(block.placedPedestalId);
+  const pulse = isPlaced ? 0.5 + Math.sin(time * 5) * 0.25 : 0.2;
+
+  ctx.save();
+  if (!block.carriedBy) {
+    ctx.fillStyle = 'rgba(12, 16, 32, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(cx, block.y + block.h + 1, block.w * 0.48, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = block.biome === 'volcano' ? '#57282A' : block.biome === 'ocean' ? '#1E5E68' : '#5B5368';
+  ctx.strokeStyle = isPlaced ? '#FDE047' : '#1E1B2E';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.roundRect(block.x, block.y, block.w, block.h, 7);
+  ctx.fill();
+  ctx.stroke();
+
+  // Inner carved relic rune emblem
+  ctx.fillStyle = `rgba(253, 224, 71, ${(0.38 + pulse).toFixed(2)})`;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 8);
+  ctx.lineTo(cx + 8, cy);
+  ctx.lineTo(cx, cy + 8);
+  ctx.lineTo(cx - 8, cy);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.26)';
+  ctx.fillRect(block.x + 4, block.y + 3, block.w - 8, 3);
+  ctx.restore();
+}
+
+/**
+ * Renders Heavy Weight Pedestal that unlocks linked Carry-Required Barriers when weighted down.
+ */
+export function drawCarryPedestal(ctx, ped, active, time, viewRange = null) {
+  if (!ped || !isRectVisible(ped.x - 16, ped.w + 32, viewRange)) return;
+  const cx = ped.x + ped.w * 0.5;
+  ctx.save();
+
+  if (active) {
+    const aura = 22 + Math.sin(time * 5) * 3;
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.28)';
+    ctx.beginPath();
+    ctx.arc(cx, ped.y - 12, aura, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#241E38';
+  ctx.strokeStyle = '#120F20';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.roundRect(ped.x - 3, ped.y - 7, ped.w + 6, 8, 3);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = active ? '#FDE047' : ped.color || '#F59E0B';
+  ctx.strokeStyle = '#181228';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(ped.x + 2, ped.y - (active ? 10 : 14), ped.w - 4, active ? 5 : 8, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  if (ped.label) {
+    ctx.font = '700 10px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(14, 18, 34, 0.9)';
+    ctx.strokeText(ped.label, cx, ped.y + 8);
+    ctx.fillStyle = active ? '#FEF08A' : '#E2E8F0';
+    ctx.fillText(ped.label, cx, ped.y + 8);
+  }
+  ctx.restore();
+}
+
+/**
+ * Renders a rising volcanic thermal updraft column over magma vents.
+ */
+export function drawThermalVent(ctx, vent, time, viewRange = null) {
+  if (!vent || !isRectVisible(vent.x - 8, vent.w + 16, viewRange)) return;
+  ctx.save();
+  const grad = ctx.createLinearGradient(vent.x, vent.y + vent.h, vent.x, vent.y);
+  grad.addColorStop(0, 'rgba(251, 146, 60, 0.34)');
+  grad.addColorStop(0.55, 'rgba(253, 186, 116, 0.16)');
+  grad.addColorStop(1, 'rgba(254, 240, 138, 0.02)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(vent.x, vent.y, vent.w, vent.h, 12);
+  ctx.fill();
+
+  const cx = vent.x + vent.w * 0.5;
+  ctx.strokeStyle = 'rgba(254, 240, 138, 0.55)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const frac = ((time * 0.72 + i * 0.25) % 1);
+    const ay = vent.y + vent.h - frac * (vent.h - 24);
+    const sway = Math.sin(time * 4 + i * 1.7) * 8;
+    ctx.globalAlpha = Math.sin(frac * Math.PI) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(cx + sway - 10, ay + 6);
+    ctx.lineTo(cx + sway, ay - 2);
+    ctx.lineTo(cx + sway + 10, ay + 6);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Renders directional underwater current streamlines pushing swimmers smoothly along (vx, vy).
+ */
+export function drawOceanCurrent(ctx, cur, time, viewRange = null) {
+  if (!cur || !isRectVisible(cur.x - 8, cur.w + 16, viewRange)) return;
+  ctx.save();
+  ctx.fillStyle = 'rgba(94, 234, 212, 0.09)';
+  ctx.strokeStyle = 'rgba(153, 246, 228, 0.28)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.roundRect(cur.x, cur.y, cur.w, cur.h, 18);
+  ctx.fill();
+  ctx.stroke();
+
+  const vx = cur.vx || 0;
+  const vy = cur.vy || 0;
+  const len = Math.max(1, Math.hypot(vx, vy));
+  const ux = vx / len;
+  const uy = vy / len;
+
+  ctx.strokeStyle = 'rgba(204, 251, 241, 0.58)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (let r = 0; r < 5; r++) {
+    const prog = ((time * 0.58 + r * 0.21) % 1);
+    const sx = cur.x + 24 + prog * Math.max(20, cur.w - 48);
+    const sy = cur.y + 32 + ((r + 0.5) / 5) * Math.max(20, cur.h - 64) + Math.sin(time * 3 + r) * 5;
+    ctx.globalAlpha = Math.sin(prog * Math.PI) * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(sx - ux * 16, sy - uy * 16);
+    ctx.lineTo(sx + ux * 16, sy + uy * 16);
+    ctx.stroke();
+
+    // Chevron head pointing along current velocity
+    ctx.beginPath();
+    ctx.moveTo(sx + ux * 16 - ux * 6 - uy * 4, sy + uy * 16 - uy * 6 + ux * 4);
+    ctx.lineTo(sx + ux * 16, sy + uy * 16);
+    ctx.lineTo(sx + ux * 16 - ux * 6 + uy * 4, sy + uy * 16 - uy * 6 - ux * 4);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Renders biome-styled climbable ladders with sharp specular highlights (zero Math.random()).
+ */
+export function drawLadder(ctx, ladder, theme, time, viewRange = null) {
+  if (!ladder || !isRectVisible(ladder.x - 10, ladder.w + 20, viewRange)) return;
+  const x = ladder.x;
+  const y = ladder.y;
+  const w = ladder.w || 32;
+  const h = ladder.h || 120;
+  const mat = ladder.material || 'vine_wood';
+
+  let railFill = '#8B5A2B';
+  let railStroke = '#3F230D';
+  let rungFill = '#C28E4C';
+  let accentGlow = null;
+
+  if (mat === 'frost_timber') {
+    railFill = '#5E8CA8';
+    railStroke = '#1E3A5F';
+    rungFill = '#BAE6FD';
+  } else if (mat === 'obsidian_iron') {
+    railFill = '#4B3A42';
+    railStroke = '#1C1117';
+    rungFill = '#FB923C';
+  } else if (mat === 'plasma_lattice') {
+    railFill = '#2E4369';
+    railStroke = '#0F172A';
+    rungFill = '#67E8F9';
+    accentGlow = 'rgba(34, 211, 238, 0.25)';
+  } else if (mat === 'coral_bamboo') {
+    railFill = '#0F766E';
+    railStroke = '#042F2E';
+    rungFill = '#F9A8D4';
+  }
+
+  ctx.save();
+  if (accentGlow) {
+    ctx.fillStyle = accentGlow;
+    ctx.fillRect(x + 2, y, w - 4, h);
+  }
+
+  const rungStep = 22;
+  ctx.lineCap = 'round';
+  for (let ry = y + 14; ry < y + h - 8; ry += rungStep) {
+    ctx.fillStyle = rungFill;
+    ctx.strokeStyle = railStroke;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.roundRect(x + 3, ry - 2.5, w - 6, 5, 2.5);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.36)';
+    ctx.fillRect(x + 6, ry - 1.8, Math.max(4, w - 12), 1.4);
+  }
+
+  // Left and right vertical side rails
+  const railW = 6;
+  [x + 2, x + w - 2 - railW].forEach((rx) => {
+    ctx.fillStyle = railFill;
+    ctx.strokeStyle = railStroke;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.roundRect(rx, y - 2, railW, h + 4, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.fillRect(rx + 1.2, y + 2, 1.6, h - 2);
+  });
+
+  // Subtle top leaf/frost/neon cap accents (deterministic sway, zero Math.random)
+  if (mat === 'vine_wood' || mat === 'coral_bamboo') {
+    const sway = Math.sin(time * 2.4 + x * 0.02) * 2.2;
+    ctx.fillStyle = mat === 'vine_wood' ? '#4ADE80' : '#5EEAD4';
+    ctx.beginPath();
+    ctx.ellipse(x + 4 + sway, y + 6, 5, 3, -0.4, 0, Math.PI * 2);
+    ctx.ellipse(x + w - 4 - sway, y + 18, 5, 3, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * Renders advancing co-op escape surge wave (avalanche snow, magma wall, or abyssal tide).
+ */
+export function drawEscapeSurge(ctx, escapeState, worldHeight, time) {
+  if (!escapeState || (!escapeState.active && !escapeState.cleared)) return;
+  const kind = escapeState.hazardKind || 'magma_wave';
+
+  ctx.save();
+  // Safe exit beacon line at endX so players clearly see the refuge threshold
+  const ex = escapeState.endX;
+  ctx.strokeStyle = escapeState.cleared ? 'rgba(110, 231, 183, 0.65)' : 'rgba(250, 204, 21, 0.72)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  ctx.moveTo(ex, 160);
+  ctx.lineTo(ex, worldHeight - 120);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.font = '800 11px "Plus Jakarta Sans", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = escapeState.cleared ? '#86EFAC' : '#FEF08A';
+  ctx.fillText(escapeState.cleared ? 'SAFE ZONE CLEARED' : 'ESCAPE LINE', ex, 148);
+
+  if (!escapeState.active) {
+    ctx.restore();
+    return;
+  }
+
+  const frontX = escapeState.wallX;
+  const spanBack = 420;
+  const leftX = frontX - spanBack;
+
+  let c0 = 'rgba(224, 242, 254, 0.94)';
+  let c1 = 'rgba(125, 211, 252, 0.84)';
+  let crest = '#FFFFFF';
+  if (kind === 'magma_wave') {
+    c0 = 'rgba(254, 215, 170, 0.95)';
+    c1 = 'rgba(239, 68, 68, 0.86)';
+    crest = '#FDE047';
+  } else if (kind === 'abyssal_tide') {
+    c0 = 'rgba(165, 243, 252, 0.92)';
+    c1 = 'rgba(13, 148, 136, 0.84)';
+    crest = '#99F6E4';
+  }
+
+  const grad = ctx.createLinearGradient(leftX, 0, frontX + 18, 0);
+  grad.addColorStop(0, c1);
+  grad.addColorStop(0.84, c0);
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(leftX, 0);
+  for (let sy = 0; sy <= worldHeight; sy += 28) {
+    const ripple = Math.sin(sy * 0.032 + time * 9.5) * 14 + Math.cos(sy * 0.07 - time * 6) * 7;
+    ctx.lineTo(frontX + ripple, sy);
+  }
+  ctx.lineTo(leftX, worldHeight);
+  ctx.closePath();
+  ctx.fill();
+
+  // Crisp glowing leading crest
+  ctx.strokeStyle = crest;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  for (let sy = 0; sy <= worldHeight; sy += 28) {
+    const ripple = Math.sin(sy * 0.032 + time * 9.5) * 14 + Math.cos(sy * 0.07 - time * 6) * 7;
+    if (sy === 0) ctx.moveTo(frontX + ripple, sy);
+    else ctx.lineTo(frontX + ripple, sy);
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Renders escalating World 3+ unpredictable dynamic traps with deterministic Canvas2D detail
+ * and readable telegraph cues (zero Math.random()).
+ */
+export function drawDynamicTrap(ctx, trap, theme, time, viewRange = null) {
+  if (!trap) return;
+
+  if (trap.kind === 'trap_chain') {
+    const stages = trap.activeStages || [];
+    const spanMin = stages.reduce((m, s) => Math.min(m, s.x), trap.x) - 16;
+    const spanMax = stages.reduce((m, s) => Math.max(m, s.x + (s.w || 42)), trap.x + (trap.w || 42)) + 16;
+    if (!isRectVisible(spanMin, spanMax - spanMin, viewRange)) return;
+
+    ctx.save();
+    // Conduit wire linking chain pads
+    if (stages.length > 1) {
+      const first = stages[0];
+      const last = stages[stages.length - 1];
+      const lineY = (first.y || trap.y) + ((first.h || 16) * 0.65);
+      ctx.strokeStyle = trap.phase === 'chaining' ? 'rgba(251, 146, 60, 0.72)' : 'rgba(148, 163, 184, 0.42)';
+      ctx.lineWidth = trap.phase === 'chaining' ? 3 : 2;
+      ctx.beginPath();
+      ctx.moveTo(first.x + (first.w || 42) * 0.5, lineY);
+      ctx.lineTo(last.x + (last.w || 42) * 0.5, lineY);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < stages.length; i++) {
+      const st = stages[i];
+      const sw = st.w || 42;
+      const sh = st.h || 16;
+      const sx = st.x;
+      const sy = st.y;
+      const cx = sx + sw * 0.5;
+      const ph = st.phase || 'dormant';
+
+      if (ph === 'armed') {
+        const pulse = 0.55 + Math.sin(time * 32 + i) * 0.35;
+        ctx.fillStyle = `rgba(251, 191, 36, ${pulse.toFixed(2)})`;
+        ctx.beginPath();
+        ctx.roundRect(sx - 3, sy - 6, sw + 6, sh + 6, 4);
+        ctx.fill();
+      } else if (ph === 'active') {
+        const eruptH = 28;
+        ctx.fillStyle = 'rgba(244, 63, 94, 0.25)';
+        ctx.beginPath();
+        ctx.roundRect(sx, sy - eruptH - 4, sw, eruptH + sh, 6);
+        ctx.fill();
+
+        for (let k = 0; k < 3; k++) {
+          const bx = sx + ((k + 0.5) / 3) * sw;
+          ctx.fillStyle = k % 2 === 0 ? '#F43F5E' : '#FB923C';
+          ctx.strokeStyle = '#181024';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(bx - 6, sy + 2);
+          ctx.lineTo(bx, sy - eruptH);
+          ctx.lineTo(bx + 6, sy + 2);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      ctx.fillStyle = ph === 'active' ? '#9F1239' : ph === 'armed' ? '#D97706' : ph === 'pending' ? '#64748B' : '#334155';
+      ctx.strokeStyle = '#0F172A';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.roundRect(sx, sy + sh - 8, sw, 8, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = ph === 'active' ? '#FECDD3' : ph === 'armed' ? '#FEF08A' : '#94A3B8';
+      ctx.beginPath();
+      ctx.arc(cx, sy + sh - 4, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (!isRectVisible(trap.x - 40, (trap.w || 64) + 80, viewRange)) return;
+  ctx.save();
+
+  if (trap.kind === 'delayed_snare') {
+    const w = trap.w || 68;
+    const h = trap.h || 16;
+    const cx = trap.x + w * 0.5;
+    const ph = trap.phase || 'dormant';
+
+    if (ph === 'armed') {
+      const pulse = 0.5 + Math.sin(time * 34) * 0.4;
+      ctx.fillStyle = `rgba(251, 191, 36, ${pulse.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.roundRect(trap.x - 4, trap.y - 4, w + 8, h + 4, 5);
+      ctx.fill();
+
+      // Telegraph warning chevron above armed plate
+      ctx.strokeStyle = '#FEF08A';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 7, trap.y - 12);
+      ctx.lineTo(cx, trap.y - 19);
+      ctx.lineTo(cx + 7, trap.y - 12);
+      ctx.stroke();
+    } else if (ph === 'active') {
+      const spikeCount = Math.max(3, Math.floor(w / 14));
+      const step = w / spikeCount;
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.24)';
+      ctx.beginPath();
+      ctx.roundRect(trap.x, trap.y - 28, w, h + 28, 6);
+      ctx.fill();
+
+      for (let i = 0; i < spikeCount; i++) {
+        const bx = trap.x + (i + 0.5) * step;
+        ctx.fillStyle = i % 2 === 0 ? '#E11D48' : '#FB7185';
+        ctx.strokeStyle = '#181024';
+        ctx.lineWidth = 1.7;
+        ctx.beginPath();
+        ctx.moveTo(bx - step * 0.42, trap.y + h - 4);
+        ctx.lineTo(bx, trap.y - 26);
+        ctx.lineTo(bx + step * 0.42, trap.y + h - 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    // Recessed snare plate
+    ctx.fillStyle = ph === 'active' ? '#7F1D1D' : ph === 'armed' ? '#B45309' : ph === 'cooldown' ? '#1E293B' : '#3F3552';
+    ctx.strokeStyle = '#140F20';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(trap.x, trap.y + h - 7, w, 7, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = ph === 'dormant' ? 'rgba(253, 224, 71, 0.35)' : '#FDE047';
+    ctx.fillRect(trap.x + 8, trap.y + h - 5, w - 16, 2);
+  } else if (trap.kind === 'collapsing_tile') {
+    const w = trap.w || 72;
+    const h = trap.h || 20;
+    const ph = trap.phase || 'dormant';
+
+    if (ph === 'collapsed') {
+      ctx.strokeStyle = 'rgba(226, 232, 240, 0.38)';
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.roundRect(trap.x, trap.y, w, h, 5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      const jitterX = ph === 'armed' ? Math.sin(time * 54) * 2.4 : 0;
+      const jitterY = ph === 'armed' ? Math.cos(time * 47) * 1.1 : 0;
+      const tx = trap.x + jitterX;
+      const ty = trap.y + jitterY;
+
+      let fill = '#6B5C78';
+      let topCap = '#A898B8';
+      if (theme === 'volcano') {
+        fill = '#5C3330';
+        topCap = '#FB923C';
+      } else if (theme === 'space') {
+        fill = '#2E4369';
+        topCap = '#67E8F9';
+      } else if (theme === 'ocean') {
+        fill = '#155E63';
+        topCap = '#5EEAD4';
+      }
+
+      ctx.fillStyle = ph === 'armed' ? '#92400E' : fill;
+      ctx.strokeStyle = ph === 'armed' ? '#FDE047' : '#140F20';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(tx, ty, w, h, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = ph === 'armed' ? '#FBBF24' : topCap;
+      ctx.fillRect(tx + 3, ty + 2, w - 6, 4);
+
+      // Distinct hairline fracture cracks so players recognize crumbling bridge tiles
+      ctx.strokeStyle = ph === 'armed' ? '#FEF08A' : 'rgba(15, 23, 42, 0.72)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(tx + w * 0.28, ty + 2);
+      ctx.lineTo(tx + w * 0.35, ty + h * 0.58);
+      ctx.lineTo(tx + w * 0.31, ty + h - 2);
+      ctx.moveTo(tx + w * 0.68, ty + 2);
+      ctx.lineTo(tx + w * 0.62, ty + h * 0.54);
+      ctx.lineTo(tx + w * 0.71, ty + h - 2);
+      ctx.stroke();
+    }
+  } else if (trap.kind === 'shifting_hazard') {
+    const w = trap.w || 54;
+    const h = trap.h || 18;
+    const minX = typeof trap.minX === 'number' ? trap.minX : trap.x - 70;
+    const maxX = typeof trap.maxX === 'number' ? trap.maxX : trap.x + 70;
+    const cx = trap.x + w * 0.5;
+    const cy = trap.y + h * 0.5;
+    const reversing = trap.phase === 'reversing';
+    const surging = (trap.surgeTimer || 0) > 0;
+
+    // Guide rail showing patrol span on ground
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(minX + 6, trap.y + h - 2);
+    ctx.lineTo(maxX - 6, trap.y + h - 2);
+    ctx.stroke();
+
+    if (reversing) {
+      ctx.fillStyle = 'rgba(250, 204, 21, 0.34)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, w * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Reversal double-arrow warning glyph
+      ctx.strokeStyle = '#FEF08A';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 10, trap.y - 12);
+      ctx.lineTo(cx + 10, trap.y - 12);
+      ctx.moveTo(cx + 5, trap.y - 16);
+      ctx.lineTo(cx + 10, trap.y - 12);
+      ctx.lineTo(cx + 5, trap.y - 8);
+      ctx.moveTo(cx - 5, trap.y - 16);
+      ctx.lineTo(cx - 10, trap.y - 12);
+      ctx.lineTo(cx - 5, trap.y - 8);
+      ctx.stroke();
+    } else if (surging) {
+      const wakeDir = -(trap.dir || 1);
+      ctx.strokeStyle = 'rgba(244, 63, 94, 0.55)';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(cx + wakeDir * 14, cy - 3);
+      ctx.lineTo(cx + wakeDir * 30, cy - 3);
+      ctx.moveTo(cx + wakeDir * 12, cy + 3);
+      ctx.lineTo(cx + wakeDir * 26, cy + 3);
+      ctx.stroke();
+    }
+
+    // Core shifting blade/orb carriage
+    ctx.fillStyle = reversing ? '#F59E0B' : surging ? '#F43F5E' : '#E11D48';
+    ctx.strokeStyle = '#181024';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(trap.x, trap.y + 3, w, h - 3, 7);
+    ctx.fill();
+    ctx.stroke();
+
+    // Spinning saw teeth / plasma prongs
+    const spin = time * (surging ? 16 : 9) * (trap.dir || 1);
+    ctx.fillStyle = '#FFE4E6';
+    for (let i = 0; i < 4; i++) {
+      const ang = spin + (i * Math.PI) / 2;
+      const tx = cx + Math.cos(ang) * (w * 0.34);
+      const ty = cy + Math.sin(ang) * 4.5;
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+
+

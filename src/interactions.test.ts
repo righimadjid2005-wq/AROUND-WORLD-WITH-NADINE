@@ -142,8 +142,8 @@ test('Ping beacons replace previous ping from same player and Dual-Player trigge
   assert.equal(hr?.kind, 'lantern-harmony');
 });
 
-test('formatRoomModeLabel formats story world/stage and open-world modes cleanly', () => {
-  assert.equal(formatRoomModeLabel({ mode: 'story', levelIndex: 0 }), 'Story W1-1');
-  assert.equal(formatRoomModeLabel({ mode: 'story', levelIndex: 6 }), 'Story W2-2');
+test('formatRoomModeLabel formats seamless 5-world story and open-world modes cleanly', () => {
+  assert.equal(formatRoomModeLabel({ mode: 'story', levelIndex: 0 }), 'Story W1 · Jungle');
+  assert.equal(formatRoomModeLabel({ mode: 'story', levelIndex: 1 }), 'Story W2 · Ice Lands');
   assert.equal(formatRoomModeLabel({ mode: 'openworld', levelIndex: 0 }), '2D Open-World');
 });

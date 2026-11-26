@@ -10,6 +10,7 @@ import {
   computeDynamicCoopCamera,
   createDanceInvite,
   createMechanicsState,
+  repelGhostWithWeapon,
   startDance,
   stepDanceSystem,
   stepGhostSystem,
@@ -22,6 +23,7 @@ import {
 import {
   createBossForLevel,
   createOpenWorldBoss,
+  damageBossWithWeapon,
   getBossStatusLabel,
   stepBoss,
 } from './bosses.js';
@@ -56,7 +58,7 @@ function makePairState(levelIdx = 0) {
   return { levelState, mechState };
 }
 
-test('dynamic co-op camera smoothly zooms out as partner separation grows across modes', () => {
+test('dynamic co-op camera stays zoomed in closer to characters (1.2x-1.35x, never zooming out) while framing safely', () => {
   const closeFraming = computeDynamicCoopCamera({
     viewW: 1280,
     viewH: 720,
@@ -77,14 +79,34 @@ test('dynamic co-op camera smoothly zooms out as partner separation grows across
     activeCharId: 'madjid',
   });
 
-  assert.ok(farFraming.scale < closeFraming.scale, 'Camera should zoom out when players separate');
-  assert.ok(farFraming.visibleW >= 1850 - 120, 'Both separated players should remain framed');
+  const weddingFraming = computeDynamicCoopCamera({
+    viewW: 1280,
+    viewH: 720,
+    worldW: 2200,
+    worldH: 640,
+    madjid: { x: 200, y: 400, w: 34, h: 36 },
+    nadine: { x: 235, y: 400, w: 34, h: 36 },
+    activeCharId: 'madjid',
+    isWedding: true,
+  });
+
+  assert.ok(closeFraming.zoomFactor >= 1.2 && closeFraming.zoomFactor <= 1.35, 'Close framing stays zoomed IN 1.20x-1.35x');
+  assert.ok(farFraming.zoomFactor >= 1.2 && farFraming.scale >= 1.2, 'Camera never zooms out (< 1.0) even on wide separation');
+  assert.ok(weddingFraming.zoomFactor >= 1.3 && weddingFraming.scale > closeFraming.scale, 'Wedding close-up tightens cleanly');
+  const clampedCamX = Math.max(0, Math.min(farFraming.maxCamX, farFraming.focusX - farFraming.visibleW * 0.5));
+  assert.ok(
+    120 >= clampedCamX && 120 <= clampedCamX + farFraming.visibleW,
+    'Active actor stays cleanly framed inside the zoomed-in viewport when partners separate'
+  );
 });
 
-test('ghost penalty system: warning banner, spawn, shock impact, Outcome A (Ghost Slap panic run)', () => {
+test('ghost penalty system: warning banner, spawn, shock impact, Outcome A (Ghost Slap -> Ethereal Phase-Dash bypasses walls)', () => {
   const { levelState, mechState } = makePairState(0);
   const madjid = levelState.actors.madjid;
   const nadine = levelState.actors.nadine;
+
+  // Place a solid wall directly between Madjid and Nadine so auto-run would have gotten stuck
+  levelState.platforms.push({ id: 'blocking_wall', x: 380, y: 120, w: 48, h: 480, kind: 'pillar' });
 
   madjid.x = 120;
   madjid.y = 480;
@@ -114,7 +136,7 @@ test('ghost penalty system: warning banner, spawn, shock impact, Outcome A (Ghos
   assert.equal(mechState.ghost.active, true);
   assert.equal(mechState.ghost.phase, 'chase');
 
-  // Step until ghost catches Nadine -> shock -> slap_run
+  // Step until ghost catches Nadine -> shock -> phase_dash
   for (let i = 0; i < 120; i++) {
     stepGhostSystem(mechState, levelState, 1 / 60, { forcedOutcome: 'slap' }, {
       onGhostShock() {
@@ -127,14 +149,15 @@ test('ghost penalty system: warning banner, spawn, shock impact, Outcome A (Ghos
     if (slapped) break;
   }
   assert.equal(shocked, true, 'Ghost encounter must trigger shock effect');
-  assert.equal(slapped, true, 'Outcome A must trigger Ghost Slap');
-  assert.equal(mechState.ghost.phase, 'slap_run');
+  assert.equal(slapped, true, 'Outcome A must trigger Ghost Slap -> Phase-Dash');
+  assert.equal(mechState.ghost.phase, 'phase_dash');
+  assert.equal(nadine.phaseDash?.active, true, 'Nadine should enter Ethereal Phase-Dash orb state');
   assert.ok(mechState.ghost.slapCalloutTimer > 0, 'Comic SLAP! callout timer should activate');
   assert.equal(nadine.mood, 'panic');
 
-  // Advance panic run -> locks controls and sprints stray player back toward partner
+  // Advance phase-dash through the solid blocking wall straight back to Madjid
   let reunited = false;
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < 180; i++) {
     const res = stepGhostSystem(mechState, levelState, 1 / 60, {}, {
       onGhostReunited() {
         reunited = true;
@@ -150,8 +173,20 @@ test('ghost penalty system: warning banner, spawn, shock impact, Outcome A (Ghos
     }
     if (reunited) break;
   }
-  assert.equal(reunited, true, 'Slapped player should panic-run straight back to partner');
+  assert.equal(reunited, true, 'Phase-dashing player should glide straight through obstacles back to partner');
   assert.equal(mechState.ghost.active, false);
+  assert.equal(nadine.phaseDash, null);
+  assert.ok(nadine.phaseRippleTimer > 0, 'Materializing from Phase-Dash activates glass-ripple effect');
+  assert.ok(nadine.x < 380, 'Nadine should have passed completely through the blocking wall at x=380');
+
+  // Also test repelling an active ghost with a weapon
+  nadine.x = 120 + GHOST_CONFIG.SPAWN_MAX + 90;
+  mechState.ghost.cooldown = 0;
+  stepGhostSystem(mechState, levelState, 1 / 60, { preferredStrayId: 'nadine' });
+  assert.equal(mechState.ghost.active, true);
+  assert.equal(repelGhostWithWeapon(mechState, levelState), true);
+  assert.equal(mechState.ghost.active, false);
+  assert.equal(mechState.ghost.phase, 'idle');
 });
 
 test('ghost penalty Outcome B: shock -> devour -> fly to partner -> drop cartoon bones -> normal respawn', () => {
@@ -306,22 +341,20 @@ test('5 low-frequency rare idle interactions trigger after 10s stillness and can
   assert.equal(mechState.idleSpecial.active, false);
 });
 
-test('cooperative region bosses (stage 5s) & open-world boss defeat via crown weak-point stomps', () => {
-  const stage1Boss = createBossForLevel(LEVELS[0]);
-  assert.equal(stage1Boss, null);
-
-  const stage5Level = LEVELS[4]; // W1-5
-  const boss = createBossForLevel(stage5Level);
+test('cooperative world bosses (all 5 worlds) & open-world boss defeat via crown stomps & weapons', () => {
+  const world1Level = LEVELS[0]; // W1 Jungle
+  const boss = createBossForLevel(world1Level);
   assert.ok(boss);
-  assert.equal(boss.hp, 3);
-  assert.equal(getBossStatusLabel(boss), 'Crown Open · Stomp!');
+  assert.equal(boss.hp, 120);
+  assert.equal(boss.maxHp, 120);
+  assert.equal(getBossStatusLabel(boss), 'Boss Arena · Attack or Stomp!');
 
-  const levelState = createInitialLevelState(stage5Level);
+  const levelState = createInitialLevelState(world1Level);
   const mechState = createMechanicsState();
 
   // Force shield, verify teamwork proximity breaks shield
   boss.shielded = true;
-  assert.equal(getBossStatusLabel(boss), 'Shielded · Team Up or Carry!');
+  assert.equal(getBossStatusLabel(boss), 'Shielded · Team Up or Hammer!');
   levelState.actors.madjid.x = 300;
   levelState.actors.nadine.x = 340;
   let shieldBroken = false;
@@ -333,9 +366,9 @@ test('cooperative region bosses (stage 5s) & open-world boss defeat via crown we
   assert.equal(shieldBroken, true);
   assert.equal(boss.shielded, false);
 
-  // Stomp Crown 3 times -> defeats boss and unlocks Stage 5 portal
+  // Crown stomps + weapon strike defeat 120 HP boss and unlock World Door
   let defeated = false;
-  for (let hit = 0; hit < 3; hit++) {
+  for (let hit = 0; hit < 2; hit++) {
     boss.hurtFlashTimer = 0;
     boss.shielded = false;
     levelState.actors.madjid.x = boss.x + 20;
@@ -347,13 +380,29 @@ test('cooperative region bosses (stage 5s) & open-world boss defeat via crown we
       },
     });
   }
+  assert.equal(defeated, false);
+  assert.equal(boss.hp, 40);
+
+  const wHit = damageBossWithWeapon(
+    boss,
+    levelState.actors.nadine,
+    { id: 'crystal_hammer', damage: 45 },
+    levelState,
+    {
+      onBossDefeat() {
+        defeated = true;
+      },
+    }
+  );
+  assert.equal(wHit.defeated, true);
   assert.equal(defeated, true);
   assert.equal(boss.defeated, true);
+  assert.equal(levelState.bossDefeated, true);
   assert.equal(levelState.portalUnlocked, true);
 
   const owBoss = createOpenWorldBoss(600, 2200);
   assert.equal(owBoss.isOpenWorld, true);
-  assert.equal(owBoss.hp, 3);
+  assert.equal(owBoss.hp, 120);
 });
 
 test('scenic photo spots, scrapbook dedup merge, and regional weather mapping', () => {
@@ -424,15 +473,11 @@ function createSpyCanvasContext() {
 }
 
 test('terrain-renderer biome mapping, Open-World worldId preservation, and viewport culling', () => {
-  assert.equal(getBiomeSurfaceType(1, 'sunrise'), 'meadow_turf');
-  assert.equal(getBiomeSurfaceType(3, 'sunset'), 'harbor_timber');
-  assert.equal(getBiomeSurfaceType(4, 'sunset'), 'canyon_sandstone');
-  assert.equal(getBiomeSurfaceType(5, 'night'), 'desert_dune');
-  assert.equal(getBiomeSurfaceType(6, 'sunrise'), 'alpine_moss');
-  assert.equal(getBiomeSurfaceType(7, 'sunrise'), 'cloud_pagoda');
-  assert.equal(getBiomeSurfaceType(8, 'night'), 'crystal_geode');
-  assert.equal(getBiomeSurfaceType(9, 'night'), 'moonlit_garden');
-  assert.equal(getBiomeSurfaceType(10, 'sunrise'), 'summit_marble');
+  assert.equal(getBiomeSurfaceType(1, 'jungle'), 'jungle_ruins');
+  assert.equal(getBiomeSurfaceType(2, 'ice'), 'ice_frost');
+  assert.equal(getBiomeSurfaceType(3, 'volcano'), 'volcano_obsidian');
+  assert.equal(getBiomeSurfaceType(4, 'space'), 'space_hull');
+  assert.equal(getBiomeSurfaceType(5, 'ocean'), 'ocean_coral');
   assert.equal(getBiomeSurfaceType(0, 'sunrise'), 'meadow_turf');
   assert.equal(getBiomeSurfaceType(0, 'sunset'), 'canyon_sandstone');
   assert.equal(getBiomeSurfaceType(0, 'night'), 'moonlit_garden');

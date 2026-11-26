@@ -1,146 +1,170 @@
 /**
  * src/bosses.js
- * Cooperative Region Bosses & Open-World Guardian Encounter
+ * Cooperative Grotesque World Bosses (5 Worlds) & Open-World Guardian Encounter
  * for "Around the World with Nadine".
  *
- * - Spawns on Stage 5 climax levels (World Stages 5, 10, 15, 20, 25, 30, 35, 40, 45, 50)
- * - Summonable anytime in 2D Open-World Mode via the Boss Summon Altar / button
- * - Non-hue-only HUD + world weak-point & shield feedback
- * - Defeated via cooperative Crown Weak Point stomps (boosting/carrying partner or high ledges)
+ * - Spawns a grotesque multi-phase boss at the climax arena of every seamless World (Worlds 1..5)
+ * - World Doors stay strictly locked until `boss.defeated === true`
+ * - Damageable by BOTH equipped Weapons/Tools AND cooperative Crown Weak-Point Stomps
  */
 
-export const BOSS_ARCHETYPES = {
-  bramble_golem: {
-    id: 'bramble_golem',
-    name: 'Bramble Golem',
-    subtitle: 'Guardian of the Outskirts',
-    bodyColor: '#5B7C4B',
-    trimColor: '#23301D',
-    crownColor: '#FDE047',
-    speed: 92,
-  },
-  harbor_kraken: {
-    id: 'harbor_kraken',
-    name: 'Harbor Kraken',
-    subtitle: 'Tidekeeper of Lantern Harbor',
-    bodyColor: '#D96B5E',
-    trimColor: '#3A1A22',
-    crownColor: '#FDE047',
-    speed: 108,
-  },
-  sand_sphinx: {
-    id: 'sand_sphinx',
-    name: 'Starlight Sphinx',
-    subtitle: 'Sentinel of the Golden Dunes',
-    bodyColor: '#C99E57',
-    trimColor: '#2E2110',
-    crownColor: '#FDE047',
-    speed: 118,
-  },
-  sky_colossus: {
-    id: 'sky_colossus',
-    name: 'Cloud Colossus',
-    subtitle: 'Warden of the High Bridges',
-    bodyColor: '#7B8FD1',
-    trimColor: '#1E2542',
-    crownColor: '#FDE047',
-    speed: 126,
-  },
-  eclipse_warden: {
-    id: 'eclipse_warden',
-    name: 'Eclipse Warden',
-    subtitle: 'Keeper of the Final Summit',
-    bodyColor: '#8B5CF6',
-    trimColor: '#1E1438',
-    crownColor: '#FDE047',
-    speed: 135,
-  },
-};
+import { WORLD_BOSS_ARCHETYPES, renderGrotesqueBoss } from './monsters.js';
+import { applyActorDamage } from './health-combat.js';
+
+export const BOSS_ARCHETYPES = WORLD_BOSS_ARCHETYPES;
 
 export function getBossArchetypeForWorld(worldId) {
-  if (worldId <= 2) return BOSS_ARCHETYPES.bramble_golem;
-  if (worldId <= 4) return BOSS_ARCHETYPES.harbor_kraken;
-  if (worldId <= 6) return BOSS_ARCHETYPES.sand_sphinx;
-  if (worldId <= 8) return BOSS_ARCHETYPES.sky_colossus;
-  return BOSS_ARCHETYPES.eclipse_warden;
+  const safeId = Math.max(1, Math.min(5, Number(worldId) || 1));
+  return WORLD_BOSS_ARCHETYPES[safeId] || WORLD_BOSS_ARCHETYPES[1];
 }
 
 /**
- * Creates a boss state on Stage 5 of every World (indices 4, 9, 14, ..., 49), or returns null.
+ * Creates a grotesque multi-phase World Boss for any story world (`worldId >= 1`)
+ * or custom world pack where `hasBoss !== false`.
  */
 export function createBossForLevel(level) {
-  if (!level || level.stageInWorld !== 5) return null;
+  if (!level || level.hasBoss === false) return null;
+  if (!level.worldId && level.stageInWorld !== 5) return null;
+
   const arch = getBossArchetypeForWorld(level.worldId || 1);
-  const groundY = level.platforms?.[0]?.y || level.worldHeight - 108;
-  const arenaMinX = Math.round(level.worldWidth * 0.42);
-  const arenaMaxX = Math.round(level.worldWidth * 0.78);
-  const startX = Math.round((arenaMinX + arenaMaxX) * 0.5);
+  const groundY = level.bossArena?.groundY ?? level.platforms?.[0]?.y ?? level.worldHeight - 108;
+  const arenaMinX = level.bossArena?.minX ?? level.bossArena?.arenaMinX ?? Math.round(level.worldWidth * 0.72);
+  const arenaMaxX = level.bossArena?.maxX ?? level.bossArena?.arenaMaxX ?? Math.round(level.worldWidth * 0.91);
+  const startX = level.bossArena?.bossX ?? Math.round((arenaMinX + arenaMaxX) * 0.5);
+
+  const worldId = Math.max(1, Number(level.worldId) || 1);
+  const initialShielded =
+    typeof level.bossArena?.initialShielded === 'boolean'
+      ? level.bossArena.initialShielded
+      : worldId >= 2;
 
   return createBossInstance(arch, {
     x: startX,
-    y: groundY - 72,
+    y: groundY - 76,
     minX: arenaMinX,
     maxX: arenaMaxX,
-    maxHp: 3,
+    maxHp: level.bossArena?.maxHp ?? arch.maxHp,
+    worldId,
+    initialShielded,
     isOpenWorld: false,
   });
 }
 
 export function createOpenWorldBoss(groundY = 600, worldWidth = 2200) {
-  return createBossInstance(BOSS_ARCHETYPES.eclipse_warden, {
+  return createBossInstance(WORLD_BOSS_ARCHETYPES[4], {
     x: 1380,
-    y: groundY - 72,
+    y: groundY - 76,
     minX: 980,
     maxX: Math.min(worldWidth - 140, 1780),
-    maxHp: 3,
+    maxHp: 120,
+    worldId: 4,
+    initialShielded: false,
     isOpenWorld: true,
   });
 }
 
 function createBossInstance(arch, opts) {
+  const worldId = Math.max(1, Number(opts.worldId ?? arch.worldId) || 1);
+  const difficultyScale = opts.isOpenWorld ? 1 : 1 + Math.max(0, worldId - 1) * 0.16;
   return {
     active: true,
     defeated: false,
     id: arch.id,
     name: arch.name,
     subtitle: arch.subtitle,
+    worldId,
+    difficultyScale,
     bodyColor: arch.bodyColor,
     trimColor: arch.trimColor,
+    accentColor: arch.accentColor,
+    eyeColor: arch.eyeColor,
     crownColor: arch.crownColor,
+    projectileKind: arch.projectileKind || 'magma_spit',
     x: opts.x,
     y: opts.y,
-    w: 76,
-    h: 72,
+    homeX: opts.x,
+    homeY: opts.y,
+    w: 78,
+    h: 76,
     minX: opts.minX,
     maxX: opts.maxX,
     dir: -1,
-    speed: arch.speed,
+    initialDir: -1,
+    speed: Math.round(arch.speed * (opts.isOpenWorld ? 1 : 1 + Math.max(0, worldId - 1) * 0.07)),
     hp: opts.maxHp,
     maxHp: opts.maxHp,
-    shielded: false,
-    shieldCycleTimer: 6.5,
+    shielded: Boolean(opts.initialShielded),
+    initialShielded: Boolean(opts.initialShielded),
+    shieldCycleTimer: worldId >= 2 && !opts.isOpenWorld ? 5.2 : 6.5,
     stunTimer: 0,
     hurtFlashTimer: 0,
-    jumpSlamTimer: 4.5,
+    jumpSlamTimer: Math.max(1.8, 3.8 / difficultyScale),
+    spitCooldown: Math.max(1.2, 2.8 / difficultyScale),
     vy: 0,
     baseY: opts.y,
     isOpenWorld: Boolean(opts.isOpenWorld),
   };
 }
 
-function clamp(v, lo, hi) {
-  return Math.max(lo, Math.min(hi, v));
-}
-
 export function getBossStatusLabel(boss) {
-  if (!boss || !boss.active) return 'Defeated';
-  if (boss.stunTimer > 0) return 'Staggered · Hit Crown!';
-  if (boss.shielded) return 'Shielded · Team Up or Carry!';
-  return 'Crown Open · Stomp!';
+  if (!boss || !boss.active) return 'Defeated · World Door Open!';
+  const phase2 = boss.hp <= Math.ceil(boss.maxHp * 0.5);
+  if (boss.stunTimer > 0) return 'Staggered · Attack or Stomp!';
+  if (boss.shielded) return 'Shielded · Team Up or Hammer!';
+  return phase2 ? 'Phase 2 Enraged · Strike!' : 'Boss Arena · Attack or Stomp!';
 }
 
 /**
- * Steps cooperative boss AI, crown weak-point stomps, shield mechanics & knockback.
+ * Applies weapon damage directly to an active World Boss.
+ */
+export function damageBossWithWeapon(boss, actor, def, levelState, callbacks = {}) {
+  if (!boss || !boss.active || boss.defeated) return { hit: false, defeated: false };
+  const weaponId = def?.id || actor?.equippedWeapon || '';
+  const breaksShield = weaponId === 'crystal_hammer' || weaponId === 'plasma_hammer';
+
+  if (boss.shielded) {
+    if (breaksShield) {
+      boss.shielded = false;
+      boss.stunTimer = Math.max(boss.stunTimer, 1.3);
+      callbacks.onBossShieldBreak?.(boss);
+    } else {
+      boss.hurtFlashTimer = 0.14;
+      callbacks.onBossShieldDeflect?.(boss, actor);
+      return { hit: false, defeated: false, shielded: true };
+    }
+  }
+
+  const dmg = Math.max(18, Math.round(def?.damage || 26));
+  boss.hp = Math.max(0, boss.hp - dmg);
+  boss.hurtFlashTimer = 0.25;
+  if (boss.hp <= Math.ceil(boss.maxHp * 0.5)) {
+    boss.speed = Math.max(boss.speed, 138);
+  }
+  callbacks.onBossHit?.(boss, actor, dmg);
+
+  if (boss.hp <= 0) {
+    finalizeBossDefeat(boss, levelState, callbacks);
+    return { hit: true, defeated: true, damage: dmg };
+  }
+  return { hit: true, defeated: false, damage: dmg };
+}
+
+function finalizeBossDefeat(boss, levelState, callbacks = {}) {
+  boss.defeated = true;
+  boss.active = false;
+  if (!boss.isOpenWorld && levelState) {
+    levelState.bossDefeated = true;
+    levelState.portalUnlocked = true;
+    if (levelState.keysRequired > levelState.keysCollected) {
+      levelState.keysCollected = levelState.keysRequired;
+    }
+    callbacks.onPortalUnlock?.(levelState.exit);
+  }
+  callbacks.onBossDefeat?.(boss);
+}
+
+/**
+ * Steps cooperative multi-phase boss AI, crown stomps, phase-2 projectiles & knockback.
  */
 export function stepBoss(boss, levelState, mechState, dt, callbacks = {}) {
   if (!boss || !boss.active || boss.defeated || levelState.completed) return boss;
@@ -149,33 +173,49 @@ export function stepBoss(boss, levelState, mechState, dt, callbacks = {}) {
 
   const madjid = levelState.actors.madjid;
   const nadine = levelState.actors.nadine;
-  const actorList = [madjid, nadine].filter(Boolean);
+  const actorList = [madjid, nadine].filter(
+    (a) => a && a.hp > 0 && !a.devouredByGhost && !a.phaseDash?.active
+  );
 
-  // Team proximity or carrying shatters active Teamwork Shield immediately!
+  const phase2 = boss.hp <= Math.ceil(boss.maxHp * 0.5);
+  const worldId = boss.worldId || 1;
+  const diffScale = boss.difficultyScale || 1;
+  const nearArena = actorList.some(
+    (a) => a.x + a.w >= boss.minX - 240 && a.x <= boss.maxX + 240
+  );
+  if (nearArena) {
+    boss.engaged = true;
+  }
+
+  // Team proximity or carrying shatters active Teamwork Shield
+  // For Worlds 2-5, require players to actually engage near the boss arena first so spawn proximity doesn't strip it prematurely.
+  const canBreakViaProximity = worldId <= 1 || boss.isOpenWorld || nearArena || boss.engaged;
   const pairDist =
     madjid && nadine
       ? Math.hypot(madjid.x - nadine.x, madjid.y - nadine.y)
       : 999;
-  if (boss.shielded && (pairDist <= 125 || Boolean(mechState?.carrying))) {
+  if (boss.shielded && canBreakViaProximity && (pairDist <= 130 || Boolean(mechState?.carrying))) {
     boss.shielded = false;
     boss.stunTimer = Math.max(boss.stunTimer, 1.1);
     callbacks.onBossShieldBreak?.(boss);
   }
 
-  // Toggle periodic shield every ~8s when hp <= 2 so cooperation shines
-  if (boss.hp <= 2 && boss.stunTimer <= 0) {
+  // Periodic Teamwork Shield cycling (Phase 2 on all worlds; Phase 1+2 on Worlds 2-5)
+  if ((phase2 || (!boss.isOpenWorld && worldId >= 2 && nearArena)) && boss.stunTimer <= 0) {
     boss.shieldCycleTimer -= dt;
     if (boss.shieldCycleTimer <= 0) {
       boss.shielded = !boss.shielded;
-      boss.shieldCycleTimer = boss.shielded ? 4.8 : 7.5;
+      const baseHold = phase2 ? 4.8 : 4.0;
+      const baseOpen = phase2 ? Math.max(4.6, 8.2 / diffScale) : Math.max(5.5, 9.5 / diffScale);
+      boss.shieldCycleTimer = boss.shielded ? baseHold : baseOpen;
     }
   }
 
   if (boss.stunTimer > 0) {
     boss.stunTimer = Math.max(0, boss.stunTimer - dt);
   } else {
-    // Patrol arena smoothly
-    boss.x += boss.dir * boss.speed * dt;
+    const activeSpeed = nearArena ? boss.speed * (phase2 ? 1.24 : 1) : boss.speed * 0.45;
+    boss.x += boss.dir * activeSpeed * dt;
     if (boss.x <= boss.minX) {
       boss.x = boss.minX;
       boss.dir = 1;
@@ -184,11 +224,48 @@ export function stepBoss(boss, levelState, mechState, dt, callbacks = {}) {
       boss.dir = -1;
     }
 
-    // Light telegraphed hop
-    boss.jumpSlamTimer -= dt;
-    if (boss.jumpSlamTimer <= 0 && boss.y >= boss.baseY - 1) {
-      boss.jumpSlamTimer = 4.2;
-      boss.vy = -310;
+    if (nearArena) {
+      boss.jumpSlamTimer -= dt;
+      if (boss.jumpSlamTimer <= 0 && boss.y >= boss.baseY - 1) {
+        boss.jumpSlamTimer = Math.max(1.45, (phase2 ? 2.8 : 4.0) / diffScale);
+        boss.vy = phase2 ? -375 : -315;
+      }
+
+      // Phase 2 grotesque projectile spit (multi-spread in higher worlds)
+      if (phase2) {
+        boss.spitCooldown -= dt;
+        if (boss.spitCooldown <= 0 && actorList.length > 0) {
+          boss.spitCooldown = Math.max(1.25, 2.5 / diffScale);
+          const target = actorList[0];
+          const bcx = boss.x + boss.w * 0.5;
+          const bcy = boss.y + boss.h * 0.4;
+          const dx = target.x + target.w * 0.5 - bcx;
+          const dy = target.y + target.h * 0.5 - bcy;
+          const baseAngle = Math.atan2(dy, dx);
+          const worldId = boss.worldId || 1;
+          const spreadOffsets = !boss.isOpenWorld && worldId >= 4 ? [-0.22, 0, 0.22] : !boss.isOpenWorld && worldId >= 2 ? [-0.14, 0.14] : [0];
+          const projSpeed = Math.round(255 * diffScale);
+          const projDmg = Math.min(30, 18 + Math.max(0, worldId - 1) * 2);
+          if (!Array.isArray(levelState.monsterProjectiles)) {
+            levelState.monsterProjectiles = [];
+          }
+          for (let sIdx = 0; sIdx < spreadOffsets.length; sIdx++) {
+            const ang = baseAngle + spreadOffsets[sIdx];
+            levelState.monsterProjectiles.push({
+              id: `bproj_${Date.now()}_${sIdx}_${Math.random()}`,
+              x: bcx + boss.dir * 24,
+              y: bcy,
+              vx: Math.cos(ang) * projSpeed,
+              vy: Math.sin(ang) * projSpeed,
+              radius: 9,
+              damage: projDmg,
+              kind: boss.projectileKind,
+              color: boss.accentColor || '#FB923C',
+              life: 2.6,
+            });
+          }
+        }
+      }
     }
   }
 
@@ -202,7 +279,6 @@ export function stepBoss(boss, levelState, mechState, dt, callbacks = {}) {
     }
   }
 
-  // Crown weak-point box at top of boss vs body hazard box
   const crownBox = {
     x: boss.x + 12,
     y: boss.y - 12,
@@ -220,7 +296,6 @@ export function stepBoss(boss, levelState, mechState, dt, callbacks = {}) {
     const actor = actorList[i];
     if (!actor || actor.hurtTimer > 0 || actor.devouredByGhost) continue;
 
-    // 1. Check Crown Weak Point Stomp (requires downward fall OR being carried high!)
     const overlapsCrown =
       actor.x < crownBox.x + crownBox.w &&
       actor.x + actor.w > crownBox.x &&
@@ -229,37 +304,28 @@ export function stepBoss(boss, levelState, mechState, dt, callbacks = {}) {
 
     if (overlapsCrown && boss.hurtFlashTimer <= 0 && (actor.vy >= -40 || actor.carriedBy)) {
       if (boss.shielded) {
-        // Gentle bounce back when shielded unless teammates are together
         actor.vy = -420;
         actor.grounded = false;
         callbacks.onBossShieldDeflect?.(boss, actor);
       } else {
-        boss.hp = Math.max(0, boss.hp - 1);
-        boss.hurtFlashTimer = 0.75;
-        boss.stunTimer = 1.1;
+        const stompDmg = Math.max(35, Math.ceil(boss.maxHp / 3));
+        boss.hp = Math.max(0, boss.hp - stompDmg);
+        boss.hurtFlashTimer = 0.65;
+        boss.stunTimer = 1.05;
         boss.shielded = false;
         actor.vy = -450;
         actor.grounded = false;
         actor.invulnTimer = Math.max(actor.invulnTimer, 0.75);
-        callbacks.onBossHit?.(boss, actor);
+        callbacks.onBossHit?.(boss, actor, stompDmg);
 
         if (boss.hp <= 0) {
-          boss.defeated = true;
-          boss.active = false;
-          // Auto-unlock exit if locked in Story Stage 5
-          if (!boss.isOpenWorld && !levelState.portalUnlocked && levelState.keysRequired > levelState.keysCollected) {
-            levelState.keysCollected = levelState.keysRequired;
-            levelState.portalUnlocked = true;
-            callbacks.onPortalUnlock?.(levelState.exit);
-          }
-          callbacks.onBossDefeat?.(boss);
+          finalizeBossDefeat(boss, levelState, callbacks);
           return boss;
         }
       }
       continue;
     }
 
-    // 2. Check Side Collision Pushback (gentle knockback instead of softlock)
     const overlapsBody =
       actor.x < bodyBox.x + bodyBox.w &&
       actor.x + actor.w > bodyBox.x &&
@@ -267,13 +333,17 @@ export function stepBoss(boss, levelState, mechState, dt, callbacks = {}) {
       actor.y + actor.h > bodyBox.y;
 
     if (overlapsBody && actor.invulnTimer <= 0 && boss.stunTimer <= 0) {
-      const pushDir = actor.x + actor.w * 0.5 < boss.x + boss.w * 0.5 ? -1 : 1;
-      actor.vx = pushDir * 280;
-      actor.vy = -260;
-      actor.grounded = false;
-      actor.invulnTimer = 0.85;
-      actor.scaleX = 1.18;
-      actor.scaleY = 0.84;
+      applyActorDamage(
+        levelState,
+        actor,
+        24,
+        {
+          sourceX: boss.x + boss.w * 0.5,
+          knockbackY: -260,
+          cause: boss.name,
+        },
+        callbacks
+      );
       callbacks.onBossBumpPlayer?.(boss, actor);
     }
   }
@@ -311,94 +381,5 @@ export function applyBossSnapshot(boss, snap) {
 }
 
 export function renderBoss(ctx, boss, time) {
-  if (!boss || !boss.active || boss.defeated) return;
-
-  const cx = boss.x + boss.w * 0.5;
-  const bottomY = boss.y + boss.h;
-  const flash = boss.hurtFlashTimer > 0 && Math.floor(time * 20) % 2 === 0;
-  const bob = boss.stunTimer > 0 ? Math.sin(time * 32) * 2.5 : Math.sin(time * 4.5) * 2;
-
-  ctx.save();
-  ctx.translate(cx, bottomY);
-
-  // Ground shadow
-  ctx.fillStyle = 'rgba(14, 16, 30, 0.36)';
-  ctx.beginPath();
-  ctx.ellipse(0, 2, 38, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.translate(0, -boss.h * 0.5 + bob);
-
-  // Teamwork Shield Dome
-  if (boss.shielded) {
-    ctx.strokeStyle = 'rgba(124, 196, 250, 0.85)';
-    ctx.fillStyle = 'rgba(124, 196, 250, 0.16)';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([7, 5]);
-    ctx.beginPath();
-    ctx.arc(0, 0, 48, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  // Boss Body
-  ctx.fillStyle = flash ? '#FFF8D6' : boss.bodyColor;
-  ctx.strokeStyle = boss.trimColor;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(-34, -30, 68, 62, [24, 24, 14, 14]);
-  ctx.fill();
-  ctx.stroke();
-
-  // Heavy Brow & Glowing Eyes
-  const faceDir = boss.dir || -1;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = boss.trimColor;
-  ctx.lineWidth = 2;
-  [-11, 11].forEach((ex) => {
-    ctx.beginPath();
-    ctx.arc(ex + faceDir * 4, -6, 6.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#181024';
-    ctx.beginPath();
-    ctx.arc(ex + faceDir * 5.8, -6, 2.8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-  });
-
-  // Glowing Golden Crown Weak-Point Target above head
-  const crownPulse = boss.shielded ? 0.5 : 1 + Math.sin(time * 6) * 0.1;
-  ctx.save();
-  ctx.translate(0, -37);
-  ctx.scale(crownPulse, crownPulse);
-  ctx.fillStyle = boss.shielded ? '#94A3B8' : boss.crownColor;
-  ctx.strokeStyle = '#2B2142';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.moveTo(-15, 5);
-  ctx.lineTo(-17, -9);
-  ctx.lineTo(-6, -2);
-  ctx.lineTo(0, -13);
-  ctx.lineTo(6, -2);
-  ctx.lineTo(17, -9);
-  ctx.lineTo(15, 5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  // Crisp Non-Hue-Only World Label & HP Pips above boss
-  ctx.font = '700 11px "Plus Jakarta Sans", system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = 'rgba(18, 18, 32, 0.92)';
-  const tag = `${boss.name} (${boss.hp}/${boss.maxHp})`;
-  ctx.strokeText(tag, 0, -56);
-  ctx.fillStyle = '#FFF4D2';
-  ctx.fillText(tag, 0, -56);
-
-  ctx.restore();
+  renderGrotesqueBoss(ctx, boss, time);
 }

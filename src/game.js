@@ -17,11 +17,12 @@ import {
   getDefaultSkinId,
   getSkin,
   getSkinsForCharacter,
+  registerSkin,
   renderCharacter,
   renderSkinPreview,
 } from './skins.js';
 import { createBackgroundSystem, TIME_PRESETS, WEATHER_PRESETS, getWeatherForWorld } from './background.js';
-import { createAudioEngine } from './audio.js';
+import { BGM_TRACKS, createAudioEngine } from './audio.js';
 import {
   LEVELS,
   STORY_PREMISE,
@@ -45,7 +46,7 @@ import {
   renderOpenWorldBlocks,
 } from './openworld.js';
 import { createCoopClient, getDefaultWsUrl } from './coop-client.js';
-import { renderCoopRoomsListComponent } from './coop-rooms-list.js';
+import { findFirstOpenRoom, renderCoopRoomsListComponent } from './coop-rooms-list.js';
 import {
   EMOTE_DEFS,
   activateLoveReaction,
@@ -68,9 +69,12 @@ import {
   renderIdleCoopOverlay,
   renderSoulLinkAura,
   renderUglyGhost,
+  repelGhostWithWeapon,
   startDance,
+  startPhaseDash,
   stepDanceSystem,
   stepGhostSystem,
+  stepPhaseDash,
   stepRareIdleInteractions,
   stepSoulLinkAndRescue,
   stopDance,
@@ -82,6 +86,7 @@ import {
   applyBossSnapshot,
   createBossForLevel,
   createOpenWorldBoss,
+  damageBossWithWeapon,
   getBossStatusLabel,
   renderBoss,
   serializeBossState,
@@ -99,14 +104,108 @@ import {
   saveLocalScrapbook,
 } from './scrapbook.js';
 import {
+  captureCheckpointSnapshot,
+  clearLastCoopRoom,
+  clearSoloCheckpointSnapshot,
+  loadLastCoopRoom,
+  loadSoloCheckpointSnapshot,
+  restoreCheckpointSnapshot,
+  saveLastCoopRoom,
+  saveSoloCheckpointSnapshot,
+} from './checkpoint-snapshot.js';
+import {
+  drawActorContactShadow,
+  drawArrowProjectile,
+  drawArrowTrap,
+  drawCarryBlock,
+  drawCarryPedestal,
+  drawDynamicTrap,
+  drawEscapeSurge,
   drawGateBarrier,
   drawGuideRail,
   drawHazardObstacle,
+  drawLadder,
   drawLinkCable,
   drawMovingPlatform,
+  drawOceanCurrent,
   drawSwitchMechanism,
+  drawTerrainContactShadows,
   drawTerrainPlatform,
+  drawThermalVent,
 } from './terrain-renderer.js';
+import {
+  createDynamicTrapState,
+  getDynamicTrapSolids,
+  stepDynamicTraps,
+} from './traps.js';
+import {
+  cycleActorWeapon,
+  drawFragileBarriers,
+  drawWeaponPickups,
+  drawWeaponSparks,
+  getWeaponDef,
+  giveActorWeapon,
+  initWeaponsForLevelState,
+  resolveActiveWeaponHits,
+  stepWeaponTimers,
+  triggerWeaponAction,
+} from './weapons.js';
+import {
+  applyActorDamage,
+  ensureCombatArrays,
+  healTeamToFull,
+  initActorHealth,
+  renderHealthOrbsAndTexts,
+  stepHealthOrbsAndCombatTexts,
+  triggerTeamRespawnAtCheckpoint,
+} from './health-combat.js';
+import {
+  createMonstersForLevel,
+  renderMonstersAndProjectiles,
+  stepSecondaryMonsters,
+} from './monsters.js';
+import {
+  createPuzzlesForLevel,
+  interactWithNearbyPuzzle,
+  isCheckpointUnlocked,
+  renderPuzzles,
+  stepPuzzles,
+  unlockPuzzleTarget,
+} from './puzzles.js';
+import {
+  createFoliagePatches,
+  perturbFoliageAt,
+  renderFoliagePatches,
+  renderToolBarrier,
+  stepFoliageSystem,
+} from './foliage.js';
+import {
+  analyzeImageFileToSkin,
+  buildCustomSkinConfig,
+  loadSavedCustomSkins,
+  saveCustomSkinToStorage,
+} from './skin-studio.js';
+import {
+  TOTAL_STORY_WORLDS,
+  completeWorldInProgression,
+  getWorldProgressionStatus,
+  isWorldDangerous,
+  isWorldUnlocked,
+  loadProgression,
+  resetProgression,
+  saveProgression,
+} from './progression.js';
+import {
+  createCompanionCatState,
+  renderCompanionCat,
+  resetCatToTeam,
+  stepCompanionCat,
+} from './companion-cat.js';
+import {
+  createStorylineState,
+  stepStoryline,
+  triggerStoryEvent,
+} from './storyline.js';
 
 export const PHYSICS = {
   CHAR_W: 34,
@@ -140,6 +239,8 @@ export function createEmptyIntent() {
   return {
     left: false,
     right: false,
+    up: false,
+    down: false,
     jumpHeld: false,
     jumpJustPressed: false,
     jumpJustReleased: false,
@@ -162,11 +263,11 @@ function approach(current, target, maxDelta) {
 
 function hasActiveMovementIntent(intent) {
   if (!intent) return false;
-  return Boolean(intent.left || intent.right || intent.jumpHeld || intent.jumpJustPressed);
+  return Boolean(intent.left || intent.right || intent.up || intent.down || intent.jumpHeld || intent.jumpJustPressed);
 }
 
 function createActor(id, name, spawn) {
-  return {
+  const actor = {
     id,
     name,
     x: spawn.x,
@@ -184,6 +285,7 @@ function createActor(id, name, spawn) {
     walkDist: 0,
     blinkTimer: id === 'madjid' ? 2.4 : 1.6,
     inPortal: false,
+    onLadder: false,
     ridingPlatformId: null,
     safeX: spawn.x,
     safeY: spawn.y,
@@ -193,40 +295,87 @@ function createActor(id, name, spawn) {
     fellOutOfWorld: false,
     kissLean: 0,
     mood: 'normal',
+    physicsMode: 'normal',
     happyPulseTimer: 0,
     blushTimer: 0,
     joyJumpTimer: 0,
     carriedBy: null,
+    carryingBlockId: null,
     danceStyle: null,
     danceTempo: 0,
     devouredByGhost: false,
     speedMult: 1,
     jumpMult: 1,
+    alive: true,
+    hp: 100,
+    maxHp: 100,
+    dashCooldown: 0,
+    phaseDash: /** @type {any} */ (null),
+    phaseRippleTimer: 0,
+    protectiveStance: false,
+    gracefulPose: false,
+    weddingCeremony: false,
+    weapons: /** @type {string[]} */ ([]),
+    equippedWeapon: /** @type {string | null} */ (null),
+    weaponAttack: {
+      active: false,
+      weaponId: null,
+      timer: 0,
+      duration: 0.3,
+      cooldown: 0,
+      facing: id === 'madjid' ? 1 : -1,
+      hitIds: [],
+    },
   };
+  initActorHealth(actor);
+  return actor;
+}
+
+/**
+ * Creates a clean, deterministic mutable simulation state for a level definition.
+ */
+export function computePortalUnlocked(state) {
+  if (!state) return false;
+  const keysOk = (state.keysCollected || 0) >= (state.keysRequired || 0);
+  const bossOk = !state.exit?.requiresBossDefeat || Boolean(state.bossDefeated);
+  return keysOk && bossOk;
 }
 
 /**
  * Creates a clean, deterministic mutable simulation state for a level definition.
  */
 export function createInitialLevelState(level) {
-  return {
+  const requiresBossDefeat = Boolean(level.exit?.requiresBossDefeat && level.hasBoss !== false);
+  const state = {
     levelId: level.id,
     worldId: typeof level.worldId === 'number' ? level.worldId : 1,
     theme: level.theme || 'sunrise',
-    code: level.code || `1-${level.id}`,
+    code: level.code || `W${level.worldId || 1}`,
+    sectors: Array.isArray(level.sectors) ? level.sectors.map((s) => ({ ...s })) : [],
     worldWidth: level.worldWidth,
     worldHeight: level.worldHeight,
+    physicsMode: level.physicsMode || 'normal',
+    gravityScale: typeof level.gravityScale === 'number' ? level.gravityScale : 1,
+    groundAccelScale: typeof level.groundAccelScale === 'number' ? level.groundAccelScale : 1,
+    groundFrictionScale: typeof level.groundFrictionScale === 'number' ? level.groundFrictionScale : 1,
+    oceanCurrents: (level.oceanCurrents || []).map((c) => ({ ...c })),
+    thermalVents: (level.thermalVents || []).map((v) => ({ ...v })),
     elapsed: 0,
     completed: false,
+    gameOver: false,
+    defeatedActorId: null,
+    defeatReason: '',
+    bossDefeated: !requiresBossDefeat,
     switchesTriggeredCount: 0,
     keysCollected: 0,
     keysRequired: level.exit.keysRequired,
-    portalUnlocked: level.exit.keysRequired === 0,
+    portalUnlocked: level.exit.keysRequired === 0 && !requiresBossDefeat,
     spawns: {
       madjid: { ...level.spawns.madjid },
       nadine: { ...level.spawns.nadine },
     },
-    activeCheckpoint: null,
+    activeCheckpoint: /** @type {any} */ (null),
+    checkpointSnapshot: /** @type {any} */ (null),
     calmTimer: 0,
     kissTimer: 0,
     kissCooldown: 1.8,
@@ -278,15 +427,85 @@ export function createInitialLevelState(level) {
     })),
     enemies: (level.enemies || []).map((en) => ({
       ...en,
+      homeX: en.x,
       dir: en.dir || 1,
+      initialDir: en.dir || 1,
       turnPause: 0,
+      stunTimer: 0,
       animPhase: en.x * 0.05,
     })),
+    arrowTraps: (level.arrowTraps || []).map((t, idx) => ({
+      ...t,
+      w: t.w || 32,
+      h: t.h || 38,
+      dir: t.dir === 1 ? 1 : -1,
+      fireInterval: t.fireInterval || 2.8,
+      telegraphSec: t.telegraphSec || 0.55,
+      projSpeed: t.projSpeed || 260,
+      damage: t.damage || 18,
+      timer: typeof t.initialDelay === 'number' ? t.initialDelay : 1.2 + idx * 0.4,
+      telegraph: false,
+    })),
+    arrowProjectiles: /** @type {any[]} */ ([]),
+    carryBlocks: (level.carryBlocks || []).map((b) => ({
+      ...b,
+      homeX: b.x,
+      homeY: b.y,
+      w: b.w || 34,
+      h: b.h || 36,
+      vx: 0,
+      vy: 0,
+      carriedBy: null,
+      placedPedestalId: null,
+    })),
+    carryPedestals: (level.carryPedestals || []).map((p) => ({
+      ...p,
+      w: p.w || 48,
+      h: p.h || 12,
+      occupied: false,
+    })),
+    monsters: createMonstersForLevel(level.monsters || []),
+    monsterProjectiles: /** @type {any[]} */ ([]),
+    puzzles: createPuzzlesForLevel(level.puzzles || []),
+    foliage: createFoliagePatches(level.foliage || [], level.theme || 'jungle'),
+    ladders: (level.ladders || []).map((l) => ({ ...l })),
+    dynamicTraps: (level.dynamicTraps || []).map(createDynamicTrapState),
+    escapeSequence: level.escapeSequence ? { ...level.escapeSequence } : null,
+    escapeState: level.escapeSequence
+      ? {
+          id: level.escapeSequence.id,
+          title: level.escapeSequence.title,
+          hazardKind: level.escapeSequence.hazardKind || 'magma_wave',
+          active: false,
+          cleared: false,
+          wallX: level.escapeSequence.wallStartX,
+          wallStartX: level.escapeSequence.wallStartX,
+          triggerX: level.escapeSequence.triggerX,
+          endX: level.escapeSequence.endX,
+          wallSpeed: level.escapeSequence.wallSpeed,
+          timeLimitSec: level.escapeSequence.timeLimitSec,
+          timeRemaining: level.escapeSequence.timeLimitSec,
+        }
+      : /** @type {any} */ (null),
+    miniScenes: (level.miniScenes || []).map((ms) => ({ ...ms, triggered: false })),
     exit: {
       ...level.exit,
     },
     decorations: (level.decorations || []).map((d) => ({ ...d })),
+    weaponPickups: /** @type {any[]} */ ([]),
+    fragileBarriers: /** @type {any[]} */ ([]),
+    weaponEffects: /** @type {any[]} */ ([]),
+    healthOrbs: /** @type {any[]} */ ([]),
+    combatTexts: /** @type {any[]} */ ([]),
+    cat: createCompanionCatState(level),
   };
+  ensureCombatArrays(state);
+  initWeaponsForLevelState(state, level);
+  state.actors.madjid.physicsMode = state.physicsMode;
+  state.actors.nadine.physicsMode = state.physicsMode;
+  state.portalUnlocked = computePortalUnlocked(state);
+  state.checkpointSnapshot = captureCheckpointSnapshot(state);
+  return state;
 }
 
 function isSwitchActive(sw) {
@@ -322,7 +541,176 @@ function getSolidObstacles(state) {
       solids.push({ x: g.x, y: g.y, w: g.w, h: g.h, isMoving: false, id: g.id });
     }
   }
+  const barriers = state.fragileBarriers || [];
+  for (let i = 0; i < barriers.length; i++) {
+    const b = barriers[i];
+    if (!b.broken) {
+      solids.push({ x: b.x, y: b.y, w: b.w, h: b.h, isMoving: false, id: b.id, isFragileBarrier: true });
+    }
+  }
+  const trapSolids = getDynamicTrapSolids(state);
+  for (let i = 0; i < trapSolids.length; i++) {
+    solids.push(trapSolids[i]);
+  }
   return solids;
+}
+
+function findSafeRectX(state, baseX, y, w, h, dir = 1) {
+  const solids = getSolidObstacles(state);
+  const clamped = clamp(baseX, 8, Math.max(8, state.worldWidth - w - 8));
+  const check = (x) => !solids.some((s) => rectsOverlap({ x, y, w, h }, s));
+  if (check(clamped)) return clamped;
+  for (let step = 12; step <= 180; step += 12) {
+    const candA = clamp(clamped - dir * step, 8, Math.max(8, state.worldWidth - w - 8));
+    if (check(candA)) return candA;
+    const candB = clamp(clamped + dir * step, 8, Math.max(8, state.worldWidth - w - 8));
+    if (check(candB)) return candB;
+  }
+  return clamped;
+}
+
+/**
+ * @param {any} state
+ * @param {any} actor
+ * @param {number | null} [dir]
+ * @param {any} [callbacks]
+ */
+export function triggerManualSoulDash(state, actor, dir = null, callbacks = {}) {
+  if (!state || !actor || state.completed || state.gameOver) return { ok: false, reason: 'INVALID' };
+  if (actor.hurtTimer > 0 || actor.devouredByGhost || actor.phaseDash?.active) {
+    return { ok: false, reason: 'BUSY' };
+  }
+  if ((actor.dashCooldown || 0) > 0) {
+    return { ok: false, reason: 'COOLDOWN' };
+  }
+  const dashDir = dir === -1 || dir === 1 ? dir : actor.facing || 1;
+  actor.facing = dashDir;
+  const maxDash = 165;
+  const blockers = [];
+  for (let i = 0; i < state.gates.length; i++) {
+    const g = state.gates[i];
+    if (g.openProgress < 0.92) blockers.push(g);
+  }
+  const barriers = state.fragileBarriers || [];
+  for (let i = 0; i < barriers.length; i++) {
+    const b = barriers[i];
+    if (!b.broken) blockers.push(b);
+  }
+  for (let i = 0; i < state.platforms.length; i++) {
+    const p = state.platforms[i];
+    if (p.kind === 'pillar') blockers.push(p);
+  }
+  let maxAllowedDist = maxDash;
+  for (let step = 8; step <= maxDash; step += 8) {
+    const probeX = clamp(actor.x + dashDir * step, 8, Math.max(8, state.worldWidth - actor.w - 8));
+    if (blockers.some((blk) => rectsOverlap({ x: probeX, y: actor.y, w: actor.w, h: actor.h }, blk))) {
+      maxAllowedDist = Math.max(0, step - 8);
+      break;
+    }
+  }
+  const targetX = findSafeRectX(state, actor.x + dashDir * maxAllowedDist, actor.y, actor.w, actor.h, dashDir);
+  startPhaseDash(actor, targetX, actor.y, 'manual', state.worldWidth);
+  actor.dashCooldown = 2.0;
+  actor.invulnTimer = Math.max(actor.invulnTimer || 0, 0.45);
+  if (Array.isArray(state.foliage)) {
+    perturbFoliageAt(state.foliage, actor.x + actor.w * 0.5, actor.y + actor.h * 0.5, 95, dashDir * 3.5);
+  }
+  callbacks.onManualDash?.(actor);
+  return { ok: true, targetX };
+}
+
+export function tryCarryBlockInteraction(state, mechState, actorId, callbacks = {}) {
+  if (!state || !actorId || state.gameOver) return { ok: false, reason: 'INVALID' };
+  const actor = state.actors?.[actorId];
+  const blocks = state.carryBlocks || [];
+  if (!actor || actor.hurtTimer > 0 || actor.devouredByGhost || actor.phaseDash?.active) {
+    return { ok: false, reason: 'BUSY' };
+  }
+  // Strict mutex: cannot carry a stone block while carrying partner
+  if (mechState?.carrying && mechState.carrying.carrierId === actorId) {
+    return { ok: false, reason: 'CARRYING_PARTNER' };
+  }
+
+  if (actor.carryingBlockId) {
+    const block = blocks.find((b) => b.id === actor.carryingBlockId);
+    if (!block) {
+      actor.carryingBlockId = null;
+      return { ok: false, reason: 'MISSING' };
+    }
+    const solids = getSolidObstacles(state);
+    const dir = actor.facing || 1;
+    const dropY = actor.y + actor.h - block.h;
+    const aheadX = clamp(actor.x + dir * 28, 6, Math.max(6, state.worldWidth - block.w - 6));
+    const fallbackX = clamp(actor.x, 6, Math.max(6, state.worldWidth - block.w - 6));
+    const canPlace = (x, y) => !solids.some((s) => rectsOverlap({ x, y, w: block.w, h: block.h }, s));
+
+    let placedX = null;
+    if (canPlace(aheadX, dropY)) placedX = aheadX;
+    else if (canPlace(fallbackX, dropY)) placedX = fallbackX;
+    else if (canPlace(fallbackX, actor.y - block.h)) {
+      block.y = actor.y - block.h;
+      placedX = fallbackX;
+    }
+
+    if (placedX === null) {
+      callbacks.onBlockBlocked?.(block, actor);
+      return { ok: false, reason: 'WALL_BLOCKED' };
+    }
+
+    block.x = placedX;
+    if (block.y > dropY) block.y = dropY;
+    else if (canPlace(placedX, dropY)) block.y = dropY;
+    block.vx = dir * 35;
+    block.vy = -40;
+    block.carriedBy = null;
+    actor.carryingBlockId = null;
+
+    // Gentle magnetic snap if dropped directly over/adjacent to a carry pedestal
+    const peds = state.carryPedestals || [];
+    for (let p = 0; p < peds.length; p++) {
+      const ped = peds[p];
+      const pedZone = { x: ped.x - 10, y: ped.y - 46, w: ped.w + 20, h: 52 };
+      if (rectsOverlap(block, pedZone)) {
+        const centeredX = clamp(ped.x + ped.w * 0.5 - block.w * 0.5, 6, Math.max(6, state.worldWidth - block.w - 6));
+        if (canPlace(centeredX, ped.y - block.h)) {
+          block.x = centeredX;
+          block.y = ped.y - block.h;
+          block.vx = 0;
+          block.vy = 0;
+          block.placedPedestalId = ped.id;
+          ped.occupied = true;
+        }
+        break;
+      }
+    }
+
+    callbacks.onBlockCarry?.('drop', block, actor);
+    return { ok: true, action: 'drop', block };
+  }
+
+  // Pick up nearby uncarried stone block
+  const acx = actor.x + actor.w * 0.5;
+  const acy = actor.y + actor.h * 0.5;
+  let best = null;
+  let bestDist = 66;
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (b.carriedBy) continue;
+    const d = Math.hypot(acx - (b.x + b.w * 0.5), acy - (b.y + b.h * 0.5));
+    if (d <= bestDist) {
+      bestDist = d;
+      best = b;
+    }
+  }
+  if (!best) return { ok: false, reason: 'NO_BLOCK_NEARBY' };
+
+  best.carriedBy = actorId;
+  best.placedPedestalId = null;
+  best.vx = 0;
+  best.vy = 0;
+  actor.carryingBlockId = best.id;
+  callbacks.onBlockCarry?.('pickup', best, actor);
+  return { ok: true, action: 'pickup', block: best };
 }
 
 function getRespawnPosition(state, actorId) {
@@ -330,50 +718,6 @@ function getRespawnPosition(state, actorId) {
     return state.activeCheckpoint[actorId];
   }
   return state.spawns[actorId];
-}
-
-function triggerActorCry(state, actor, partner, callbacks, fromPit = false) {
-  if (actor.hurtTimer > 0) return;
-  state.kissTimer = 0;
-  state.calmTimer = 0;
-  actor.kissLean = 0;
-  if (partner) partner.kissLean = 0;
-
-  state.cryCount += 1;
-  actor.mood = 'crying';
-  actor.tearEmitTimer = 0.03;
-  actor.coyoteTimer = 0;
-  actor.jumpBufferTimer = 0;
-  actor.ridingPlatformId = null;
-
-  if (partner && partner.hurtTimer <= 0) {
-    partner.mood = 'worried';
-  }
-
-  if (fromPit) {
-    const dest = getRespawnPosition(state, actor.id);
-    actor.x = dest.x;
-    actor.y = dest.y;
-    actor.vx = 0;
-    actor.vy = 0;
-    actor.grounded = false;
-    actor.hurtTimer = 0.68;
-    actor.invulnTimer = 1.45;
-    actor.fellOutOfWorld = true;
-    actor.scaleX = 1.18;
-    actor.scaleY = 0.84;
-    callbacks.onCry?.(actor);
-    callbacks.onRespawn?.(actor);
-  } else {
-    actor.hurtTimer = 0.85;
-    actor.fellOutOfWorld = false;
-    actor.vx = -(actor.facing || 1) * 48;
-    actor.vy = -170;
-    actor.grounded = false;
-    actor.scaleX = 0.86;
-    actor.scaleY = 1.16;
-    callbacks.onCry?.(actor);
-  }
 }
 
 /**
@@ -387,6 +731,7 @@ export function isSafeForAffection(state, inputsByChar = null) {
   if (!madjid || !nadine) return false;
 
   if (madjid.hurtTimer > 0 || nadine.hurtTimer > 0) return false;
+  if (madjid.phaseDash?.active || nadine.phaseDash?.active) return false;
   if (!madjid.grounded || !nadine.grounded) return false;
   if (Math.abs(madjid.vx) > 28 || Math.abs(nadine.vx) > 28) return false;
 
@@ -433,6 +778,176 @@ export function isSafeForAffection(state, inputsByChar = null) {
   return true;
 }
 
+export function isHazardActive(hz, elapsed = 0) {
+  if (!hz) return false;
+  if (hz.kind === 'laser_beam') {
+    const period = hz.cyclePeriod || 3.0;
+    const phase = (((elapsed + (hz.phase || 0)) % period) + period) % period;
+    return phase < period * 0.56;
+  }
+  return true;
+}
+
+/**
+ * Finds the first climbable ladder overlapping or immediately bordering an actor.
+ * @param {any} state
+ * @param {any} actor
+ */
+export function findOverlappingLadder(state, actor) {
+  const ladders = state?.ladders;
+  if (!Array.isArray(ladders) || ladders.length === 0 || !actor) return null;
+  for (let i = 0; i < ladders.length; i++) {
+    const l = ladders[i];
+    const zone = { x: l.x - 4, y: l.y - 6, w: (l.w || 32) + 8, h: (l.h || 120) + 6 };
+    if (rectsOverlap(actor, zone)) {
+      return l;
+    }
+  }
+  return null;
+}
+
+/**
+ * Pure biome ladder climb handler. Suspends gravity while on a ladder and allows
+ * clean top-deck exit landing onto ladder.y or directional jump-off.
+ * @param {any} state
+ * @param {any} actor
+ * @param {any} intent
+ * @param {number} _dt
+ */
+export function stepLadders(state, actor, intent, _dt) {
+  const ladder = findOverlappingLadder(state, actor);
+  if (!ladder) {
+    actor.onLadder = false;
+    return false;
+  }
+
+  const wantsClimb = Boolean(intent.up || intent.down);
+  if (!actor.onLadder && !wantsClimb) {
+    return false;
+  }
+
+  // If actor is already standing squarely above top of ladder and not pressing down, stay on top deck
+  if (!actor.onLadder && actor.grounded && actor.y + actor.h <= ladder.y + 4 && !intent.down) {
+    return false;
+  }
+
+  const moveDir = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
+  if (actor.onLadder && moveDir !== 0 && intent.jumpJustPressed) {
+    actor.onLadder = false;
+    actor.grounded = false;
+    actor.vx = moveDir * PHYSICS.MOVE_SPEED * 0.85;
+    actor.vy = PHYSICS.JUMP_VY * (actor.jumpMult || 1) * 0.88;
+    actor.facing = moveDir;
+    return false;
+  }
+
+  actor.onLadder = true;
+  actor.grounded = false;
+  actor.ridingPlatformId = null;
+  const climbSpeed = 185;
+  if (intent.up) {
+    actor.vy = -climbSpeed;
+  } else if (intent.down) {
+    actor.vy = climbSpeed;
+  } else {
+    actor.vy = 0;
+  }
+
+  const ladderCx = ladder.x + (ladder.w || 32) * 0.5;
+  if (moveDir !== 0) {
+    actor.facing = moveDir;
+    actor.vx = moveDir * 135;
+  } else {
+    actor.vx = (ladderCx - (actor.x + actor.w * 0.5)) * 6;
+  }
+
+  // Smooth step-off onto platform at top of ladder
+  if (intent.up && actor.y + actor.h <= ladder.y + 3) {
+    actor.y = ladder.y - actor.h;
+    actor.vy = 0;
+    actor.grounded = true;
+    actor.onLadder = false;
+    return false;
+  }
+
+  // Release at base of ladder onto floor
+  const ladderBottom = ladder.y + (ladder.h || 120);
+  if (intent.down && actor.y + actor.h >= ladderBottom - 2) {
+    actor.y = ladderBottom - actor.h;
+    actor.vy = 0;
+    actor.grounded = true;
+    actor.onLadder = false;
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Resets active escape wave surge and respawns both characters cleanly at the last safe checkpoint.
+ * @param {any} state
+ * @param {any} [callbacks]
+ */
+export function triggerEscapeFailRespawn(state, callbacks = {}) {
+  if (!state) return null;
+  const esc = state.escapeState;
+  if (esc) {
+    esc.active = false;
+    esc.cleared = false;
+    esc.wallX = esc.wallStartX;
+    esc.timeRemaining = esc.timeLimitSec;
+  }
+  const res = triggerTeamRespawnAtCheckpoint(state, callbacks);
+  callbacks.onEscapeFail?.(esc, res);
+  return res;
+}
+
+/**
+ * Steps timed co-op escape gauntlets (W2 Avalanche, W3 Magma Wave, W5 Abyssal Tide).
+ * Both partners must pass endX before time runs out or the wave reaches either partner.
+ * @param {any} state
+ * @param {number} dt
+ * @param {any} [callbacks]
+ */
+export function stepEscapeSequence(state, dt, callbacks = {}) {
+  const esc = state?.escapeState;
+  if (!esc || esc.cleared || !state.actors?.madjid || !state.actors?.nadine) return esc;
+
+  const m = state.actors.madjid;
+  const n = state.actors.nadine;
+
+  if (!esc.active) {
+    const mTrig = m.x >= esc.triggerX && m.x < esc.endX;
+    const nTrig = n.x >= esc.triggerX && n.x < esc.endX;
+    if (mTrig || nTrig) {
+      esc.active = true;
+      esc.wallX = esc.wallStartX;
+      esc.timeRemaining = esc.timeLimitSec;
+      callbacks.onEscapeStart?.(esc);
+    }
+    return esc;
+  }
+
+  esc.wallX += esc.wallSpeed * dt;
+  esc.timeRemaining = Math.max(0, esc.timeRemaining - dt);
+
+  if (m.x >= esc.endX && n.x >= esc.endX) {
+    esc.active = false;
+    esc.cleared = true;
+    callbacks.onEscapeClear?.(esc);
+    return esc;
+  }
+
+  const minAliveX = Math.min(
+    m.phaseDash?.active || m.devouredByGhost ? Infinity : m.x,
+    n.phaseDash?.active || n.devouredByGhost ? Infinity : n.x
+  );
+  if (esc.timeRemaining <= 0 || esc.wallX >= minAliveX + 10) {
+    triggerEscapeFailRespawn(state, callbacks);
+  }
+  return esc;
+}
+
 /**
  * Pure simulation tick — advances moving platforms, gates, patrol enemies, both actors,
  * checkpoints, hazards, cry-on-death + checkpoint respawn, switches, keys,
@@ -440,9 +955,14 @@ export function isSafeForAffection(state, inputsByChar = null) {
  */
 export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
   const dt = Math.min(Math.max(rawDt, 0), PHYSICS.MAX_DT);
-  if (state.completed || dt <= 0) return state;
+  if (state.completed || state.gameOver || dt <= 0) return state;
 
   state.elapsed += dt;
+  ensureCombatArrays(state);
+  for (let i = 0; i < state.hazards.length; i++) {
+    const hz = state.hazards[i];
+    hz.activeNow = isHazardActive(hz, state.elapsed);
+  }
 
   // 1. Update Moving Platforms & Track Deltas
   for (let i = 0; i < state.movingPlatforms.length; i++) {
@@ -486,11 +1006,26 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
     mp.dy = mp.y - prevY;
   }
 
-  // 2. Update Gates
+  // 1b. Carry Block Pedestals & Linked Gates
+  const carryBlocks = state.carryBlocks || [];
+  const carryPedestals = state.carryPedestals || [];
+  for (let p = 0; p < carryPedestals.length; p++) {
+    const ped = carryPedestals[p];
+    const sensorBox = { x: ped.x - 4, y: ped.y - 44, w: ped.w + 8, h: 48 };
+    const matchedBlock = carryBlocks.find((b) => !b.carriedBy && rectsOverlap(b, sensorBox));
+    ped.occupied = Boolean(matchedBlock);
+  }
+
+  // 2. Update Gates (supports hold-relay switches + far-side latchSwitches)
   for (let i = 0; i < state.gates.length; i++) {
     const g = state.gates[i];
-    const triggered = checkSwitchGroup(state, g.switches, g.requireAll);
-    if (triggered && g.latchOnOpen && !g.latchedOpen) {
+    const pedestalOk = g.requiresPedestalId
+      ? Boolean(carryPedestals.find((p) => p.id === g.requiresPedestalId)?.occupied)
+      : true;
+    const switchOk = !g.switches || g.switches.length === 0 ? true : checkSwitchGroup(state, g.switches, g.requireAll);
+    const latchOk = g.latchSwitches?.length ? checkSwitchGroup(state, g.latchSwitches, false) : false;
+    const triggered = Boolean((g.switches?.length || g.requiresPedestalId) && switchOk && pedestalOk);
+    if (((triggered && g.latchOnOpen) || latchOk) && !g.latchedOpen) {
       g.latchedOpen = true;
       callbacks.onGateUnseal?.(g);
     }
@@ -512,6 +1047,10 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
   // 3. Update Patrol Enemies
   for (let i = 0; i < state.enemies.length; i++) {
     const en = state.enemies[i];
+    if (en.stunTimer > 0) {
+      en.stunTimer = Math.max(0, en.stunTimer - dt);
+      continue;
+    }
     en.animPhase += dt * 7.5;
     if (en.turnPause > 0) {
       en.turnPause = Math.max(0, en.turnPause - dt);
@@ -536,13 +1075,16 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
     }
   }
 
+  // 3b. Advance Escalating Unpredictable Traps (W3+) before solids collision pass
+  stepDynamicTraps(state, dt, callbacks);
+
   const solids = getSolidObstacles(state);
   const actorOrder = ['madjid', 'nadine'];
 
   // 4. Apply Moving Platform Carry Before Physics Integration
   for (let i = 0; i < actorOrder.length; i++) {
     const actor = state.actors[actorOrder[i]];
-    if (actor.hurtTimer <= 0 && actor.grounded && actor.ridingPlatformId) {
+    if (actor.hurtTimer <= 0 && !actor.phaseDash?.active && actor.grounded && actor.ridingPlatformId) {
       const mp = state.movingPlatforms.find((p) => p.id === actor.ridingPlatformId);
       if (mp) {
         actor.x += mp.dx;
@@ -557,6 +1099,7 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
     const actor = state.actors[id];
     const partner = state.actors[id === 'madjid' ? 'nadine' : 'madjid'];
     const intent = inputsByChar[id] || createEmptyIntent();
+    actor.physicsMode = state.physicsMode || 'normal';
 
     // Timers & spring recovery
     actor.blinkTimer -= dt;
@@ -566,8 +1109,17 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
     if (actor.invulnTimer > 0) {
       actor.invulnTimer = Math.max(0, actor.invulnTimer - dt);
     }
+    if (actor.hurtFlashTimer > 0) {
+      actor.hurtFlashTimer = Math.max(0, actor.hurtFlashTimer - dt);
+    }
+    if (actor.dashCooldown > 0) {
+      actor.dashCooldown = Math.max(0, actor.dashCooldown - dt);
+    }
     if (actor.happyPulseTimer > 0) {
       actor.happyPulseTimer = Math.max(0, actor.happyPulseTimer - dt);
+    }
+    if (actor.phaseRippleTimer > 0) {
+      actor.phaseRippleTimer = Math.max(0, actor.phaseRippleTimer - dt);
     }
     const spring = Math.min(1, dt * 13);
     actor.scaleX += (1 - actor.scaleX) * spring;
@@ -614,7 +1166,7 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
       }
 
       if (actor.hurtTimer <= 0) {
-        if (!actor.fellOutOfWorld) {
+        if (!state.gameOver && !actor.fellOutOfWorld) {
           const dest = getRespawnPosition(state, actor.id);
           actor.x = dest.x;
           actor.y = dest.y;
@@ -626,63 +1178,174 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
           actor.scaleY = 0.86;
           callbacks.onRespawn?.(actor);
         }
-        actor.fellOutOfWorld = false;
-        actor.mood = 'normal';
+        if (!state.gameOver) {
+          actor.alive = true;
+          actor.fellOutOfWorld = false;
+          actor.mood = 'normal';
+        }
       }
       continue;
     }
 
-    // Skip independent physics integration when carried on partner's head or swallowed inside ghost
+    actor.alive = true;
+
+    // Skip independent physics integration when carried on partner's head, swallowed inside ghost, or Ethereal Phase-Dashing
+    if (actor.phaseDash?.active) {
+      if (actor.phaseDash.reason !== 'ghost') {
+        const arrived = stepPhaseDash(actor, dt);
+        if (arrived) {
+          actor.x = findSafeRectX(state, actor.x, actor.y, actor.w, actor.h, actor.facing || 1);
+          callbacks.onPhaseArrive?.(actor);
+        }
+      }
+      continue;
+    }
     if (actor.carriedBy || actor.devouredByGhost) {
       continue;
     }
 
-    // Horizontal acceleration & smooth friction (with Soul-Link & Ghost Slap panic sprint boost)
+    // Ladder climbing overrides gravity while gripping rungs
+    const onLadderNow = stepLadders(state, actor, intent, dt);
+
+    // Horizontal & vertical biome physics (Ice friction, Volcano thermals, Space 4-way Zero-G, Underwater 4-way swim + currents)
     const panicMult = actor.mood === 'panic' ? 1.72 : 1;
     const speedMult = (actor.speedMult || 1) * panicMult;
     const jumpMult = actor.jumpMult || 1;
+    const groundAccelScale = state.groundAccelScale ?? 1;
+    const groundFrictionScale = state.groundFrictionScale ?? 1;
     const moveDir = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
-    if (moveDir !== 0) {
-      actor.facing = moveDir;
-      const accel = (actor.grounded ? PHYSICS.GROUND_ACCEL : PHYSICS.AIR_ACCEL) * panicMult;
-      actor.vx = approach(actor.vx, moveDir * PHYSICS.MOVE_SPEED * speedMult, accel * dt);
+
+    if (onLadderNow) {
+      // Velocity handled cleanly by stepLadders
+    } else if (state.physicsMode === 'space_swim') {
+      const moveY = (intent.down ? 1 : 0) - (intent.up || intent.jumpHeld ? 1 : 0);
+      if (moveDir !== 0) {
+        actor.facing = moveDir;
+        actor.vx = approach(actor.vx, moveDir * PHYSICS.MOVE_SPEED * speedMult * 0.94, 820 * panicMult * dt);
+      } else {
+        actor.vx = approach(actor.vx, 0, 180 * dt);
+      }
+
+      if (moveY !== 0) {
+        actor.vy = approach(actor.vy, moveY * 255 * jumpMult, 780 * dt);
+        actor.grounded = false;
+        actor.ridingPlatformId = null;
+      } else {
+        actor.vy = approach(actor.vy, 0, 160 * dt);
+      }
+
+      if (actor.grounded && intent.jumpJustPressed && !intent.down) {
+        actor.vy = -210 * jumpMult;
+        actor.grounded = false;
+        actor.ridingPlatformId = null;
+        actor.scaleX = 0.86;
+        actor.scaleY = 1.16;
+        callbacks.onJump?.(actor);
+      }
+
+      const gravScale = state.gravityScale ?? 0.02;
+      actor.vy = clamp(actor.vy + PHYSICS.GRAVITY * gravScale * dt, -275, 275);
+    } else if (state.physicsMode === 'underwater') {
+      let flowVx = 0;
+      let flowVy = 0;
+      const currents = state.oceanCurrents || [];
+      for (let c = 0; c < currents.length; c++) {
+        const cur = currents[c];
+        if (rectsOverlap(actor, cur)) {
+          flowVx += cur.vx || 0;
+          flowVy += cur.vy || 0;
+        }
+      }
+
+      if (moveDir !== 0) {
+        actor.facing = moveDir;
+        const accel = actor.grounded ? 1450 : 980;
+        actor.vx = approach(
+          actor.vx,
+          moveDir * PHYSICS.MOVE_SPEED * speedMult * 0.88 + flowVx * 0.5,
+          accel * panicMult * dt
+        );
+      } else {
+        const decel = actor.grounded ? 1100 : 280;
+        actor.vx = approach(actor.vx, actor.grounded ? 0 : flowVx, decel * dt);
+      }
+
+      if (intent.up || intent.jumpHeld) {
+        actor.vy = approach(actor.vy, -245 * jumpMult + flowVy * 0.4, 720 * dt);
+        actor.grounded = false;
+        actor.ridingPlatformId = null;
+      } else if (intent.down) {
+        actor.vy = approach(actor.vy, 250 + flowVy * 0.4, 720 * dt);
+        actor.grounded = false;
+        actor.ridingPlatformId = null;
+      } else {
+        actor.vy = approach(actor.vy, flowVy !== 0 ? flowVy : 48, 280 * dt);
+      }
+
+      if (actor.grounded && intent.jumpJustPressed && !intent.down) {
+        actor.vy = -220 * jumpMult;
+        actor.grounded = false;
+        actor.ridingPlatformId = null;
+        actor.scaleX = 0.86;
+        actor.scaleY = 1.18;
+        callbacks.onJump?.(actor);
+      }
+
+      actor.vy = clamp(actor.vy, -280, 290);
     } else {
-      const decel = actor.grounded ? PHYSICS.GROUND_FRICTION : PHYSICS.AIR_DRAG;
-      actor.vx = approach(actor.vx, 0, decel * dt);
-    }
+      if (moveDir !== 0) {
+        actor.facing = moveDir;
+        const accel = (actor.grounded ? PHYSICS.GROUND_ACCEL * groundAccelScale : PHYSICS.AIR_ACCEL) * panicMult;
+        actor.vx = approach(actor.vx, moveDir * PHYSICS.MOVE_SPEED * speedMult, accel * dt);
+      } else {
+        const decel = actor.grounded ? PHYSICS.GROUND_FRICTION * groundFrictionScale : PHYSICS.AIR_DRAG;
+        actor.vx = approach(actor.vx, 0, decel * dt);
+      }
 
-    // Coyote time & jump buffering (~110ms each)
-    if (actor.grounded) {
-      actor.coyoteTimer = PHYSICS.COYOTE_TIME;
-    } else {
-      actor.coyoteTimer = Math.max(0, actor.coyoteTimer - dt);
-    }
+      // Coyote time & jump buffering (~110ms each)
+      if (actor.grounded) {
+        actor.coyoteTimer = PHYSICS.COYOTE_TIME;
+      } else {
+        actor.coyoteTimer = Math.max(0, actor.coyoteTimer - dt);
+      }
 
-    if (intent.jumpJustPressed) {
-      actor.jumpBufferTimer = PHYSICS.JUMP_BUFFER_TIME;
-    } else {
-      actor.jumpBufferTimer = Math.max(0, actor.jumpBufferTimer - dt);
-    }
+      if (intent.jumpJustPressed) {
+        actor.jumpBufferTimer = PHYSICS.JUMP_BUFFER_TIME;
+      } else {
+        actor.jumpBufferTimer = Math.max(0, actor.jumpBufferTimer - dt);
+      }
 
-    // Execute buffered jump if within coyote window
-    if (actor.jumpBufferTimer > 0 && actor.coyoteTimer > 0) {
-      actor.vy = PHYSICS.JUMP_VY * jumpMult;
-      actor.grounded = false;
-      actor.ridingPlatformId = null;
-      actor.coyoteTimer = 0;
-      actor.jumpBufferTimer = 0;
-      actor.scaleX = 0.82;
-      actor.scaleY = 1.22;
-      callbacks.onJump?.(actor);
-    }
+      // Execute buffered jump if within coyote window
+      if (actor.jumpBufferTimer > 0 && actor.coyoteTimer > 0) {
+        actor.vy = PHYSICS.JUMP_VY * jumpMult;
+        actor.grounded = false;
+        actor.ridingPlatformId = null;
+        actor.coyoteTimer = 0;
+        actor.jumpBufferTimer = 0;
+        actor.scaleX = 0.82;
+        actor.scaleY = 1.22;
+        callbacks.onJump?.(actor);
+      }
 
-    // Variable jump height cut when jump is released while ascending
-    if (intent.jumpJustReleased && actor.vy < -170) {
-      actor.vy *= PHYSICS.JUMP_CUT_MULT;
-    }
+      // Variable jump height cut when jump is released while ascending
+      if (intent.jumpJustReleased && actor.vy < -170) {
+        actor.vy *= PHYSICS.JUMP_CUT_MULT;
+      }
 
-    // Gravity
-    actor.vy = Math.min(PHYSICS.MAX_FALL_SPEED, actor.vy + PHYSICS.GRAVITY * dt);
+      // Biome-scaled Gravity + Rising Volcanic Thermal Vents
+      const gravScale = state.gravityScale ?? 1;
+      actor.vy = Math.min(PHYSICS.MAX_FALL_SPEED, actor.vy + PHYSICS.GRAVITY * gravScale * dt);
+
+      const vents = state.thermalVents || [];
+      for (let v = 0; v < vents.length; v++) {
+        const vent = vents[v];
+        if (rectsOverlap(actor, vent)) {
+          actor.vy = Math.max(-410, actor.vy - (vent.lift || 760) * dt);
+          actor.grounded = false;
+          actor.ridingPlatformId = null;
+        }
+      }
+    }
 
     // Move & resolve X axis
     const prevX = actor.x;
@@ -760,20 +1423,166 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
       actor.walkDist += Math.abs(actor.x - prevX);
     }
 
-    // Canyon fall -> cry + checkpoint respawn
+    // Canyon fall -> damage + warp back to safe/checkpoint (or defeat on 0 HP)
     if (actor.y > state.worldHeight + 48) {
-      triggerActorCry(state, actor, partner, callbacks, true);
+      const res = applyActorDamage(
+        state,
+        actor,
+        25,
+        { sourceX: actor.x, knockbackY: 0, cause: 'Abyss Fall' },
+        callbacks
+      );
+      if (!res.gameOver && !state.gameOver) {
+        const dest = getRespawnPosition(state, actor.id);
+        actor.x = dest.x;
+        actor.y = dest.y;
+        actor.vx = 0;
+        actor.vy = 0;
+        actor.grounded = false;
+        actor.invulnTimer = Math.max(actor.invulnTimer || 0, 1.35);
+        callbacks.onRespawn?.(actor);
+      }
     }
   }
 
   const actorList = [state.actors.madjid, state.actors.nadine];
 
-  // 6. Checkpoints Activation (Lantern Posts)
+  // 5b. Carry Blocks Physics, Pedestal Seating & Hazard/Pit Snap-Back
+  for (let i = 0; i < carryBlocks.length; i++) {
+    const block = carryBlocks[i];
+    if (block.carriedBy) {
+      const carrier = state.actors[block.carriedBy];
+      if (!carrier || carrier.hurtTimer > 0 || carrier.devouredByGhost) {
+        block.carriedBy = null;
+        if (carrier) carrier.carryingBlockId = null;
+      } else {
+        block.x = carrier.x + carrier.w * 0.5 - block.w * 0.5;
+        block.y = carrier.y - block.h - 2;
+        block.vx = 0;
+        block.vy = 0;
+        block.placedPedestalId = null;
+        continue;
+      }
+    }
+
+    block.vx = approach(block.vx || 0, 0, 900 * dt);
+    const blockGravScale = Math.max(0.35, state.gravityScale ?? 1);
+    block.vy = Math.min(680, (block.vy || 0) + PHYSICS.GRAVITY * blockGravScale * dt);
+    block.x = clamp(block.x + block.vx * dt, 4, state.worldWidth - block.w - 4);
+    for (let s = 0; s < solids.length; s++) {
+      const box = solids[s];
+      if (rectsOverlap(block, box)) {
+        if (block.vx > 0) block.x = box.x - block.w;
+        else if (block.vx < 0) block.x = box.x + box.w;
+        block.vx = 0;
+      }
+    }
+    block.y += block.vy * dt;
+    for (let s = 0; s < solids.length; s++) {
+      const box = solids[s];
+      if (rectsOverlap(block, box)) {
+        if (block.vy >= 0) {
+          block.y = box.y - block.h;
+          block.vy = 0;
+        } else {
+          block.y = box.y + box.h;
+          block.vy = 0;
+        }
+      }
+    }
+
+    // Seat on Carry Pedestals
+    block.placedPedestalId = null;
+    for (let p = 0; p < carryPedestals.length; p++) {
+      const ped = carryPedestals[p];
+      const pedZone = { x: ped.x - 4, y: ped.y - 44, w: ped.w + 8, h: 48 };
+      if (rectsOverlap(block, pedZone)) {
+        block.placedPedestalId = ped.id;
+        ped.occupied = true;
+        break;
+      }
+    }
+
+    // Hazard/pit snap-back so carry blocks can never become unreachable
+    const onHazard = state.hazards.some((hz) => isHazardActive(hz, state.elapsed) && rectsOverlap(block, hz));
+    if (onHazard || block.y > state.worldHeight + 28) {
+      block.x = block.homeX;
+      block.y = block.homeY;
+      block.vx = 0;
+      block.vy = 0;
+      block.placedPedestalId = null;
+      callbacks.onBlockSnapBack?.(block);
+    }
+  }
+
+  // 5c. Arrow Traps & Moving Projectiles
+  const traps = state.arrowTraps || [];
+  for (let i = 0; i < traps.length; i++) {
+    const trap = traps[i];
+    trap.timer -= dt;
+    trap.telegraph = trap.timer <= (trap.telegraphSec || 0.55);
+    if (trap.timer <= 0) {
+      trap.timer = trap.fireInterval || 2.8;
+      trap.telegraph = false;
+      state.arrowProjectiles.push({
+        id: `arr_${i}_${Math.round(state.elapsed * 1000)}`,
+        x: trap.dir === 1 ? trap.x + (trap.w || 32) : trap.x - 14,
+        y: trap.y + 13,
+        w: 16,
+        h: 6,
+        vx: (trap.dir === 1 ? 1 : -1) * (trap.projSpeed || 260),
+        damage: trap.damage || 18,
+        life: 3.4,
+      });
+      callbacks.onArrowFire?.(trap);
+    }
+  }
+  for (let i = state.arrowProjectiles.length - 1; i >= 0; i--) {
+    const proj = state.arrowProjectiles[i];
+    proj.life -= dt;
+    proj.x += proj.vx * dt;
+    if (proj.life <= 0 || proj.x < -32 || proj.x > state.worldWidth + 32) {
+      state.arrowProjectiles.splice(i, 1);
+      continue;
+    }
+    const hitSolid = solids.some((s) => rectsOverlap(proj, s));
+    if (hitSolid) {
+      state.arrowProjectiles.splice(i, 1);
+      continue;
+    }
+    let hitActor = false;
+    for (let a = 0; a < actorList.length; a++) {
+      const actor = actorList[a];
+      if (!actor || actor.hurtTimer > 0 || actor.invulnTimer > 0 || actor.phaseDash?.active || actor.devouredByGhost) {
+        continue;
+      }
+      if (rectsOverlap(proj, actor)) {
+        applyActorDamage(
+          state,
+          actor,
+          proj.damage || 18,
+          { sourceX: proj.x, knockbackY: -210, cause: 'Arrow Trap' },
+          callbacks
+        );
+        hitActor = true;
+        break;
+      }
+    }
+    if (hitActor) {
+      state.arrowProjectiles.splice(i, 1);
+    }
+  }
+
+  // 6. Checkpoints Activation (Lantern Posts + Puzzle-Lock Check + Team Full Heal)
   for (let c = 0; c < state.checkpoints.length; c++) {
     const cp = state.checkpoints[c];
     const cpBox = { x: cp.x - 24, y: cp.y - 56, w: 48, h: 56 };
     const visitor = actorList.find((a) => a.hurtTimer <= 0 && rectsOverlap(a, cpBox));
     if (visitor) {
+      if (!isCheckpointUnlocked(state, cp)) {
+        callbacks.onCheckpointLocked?.(cp, visitor);
+        continue;
+      }
       const respawnPayload = {
         id: cp.id,
         x: cp.x,
@@ -791,42 +1600,86 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
         cp.activated = true;
         cp.pulse = 1;
         state.activeCheckpoint = respawnPayload;
-        callbacks.onCheckpoint?.(cp, visitor);
+        healTeamToFull(state, callbacks);
+        const litCount = state.checkpoints.filter((item) => item.activated).length;
+        state.checkpointSnapshot = captureCheckpointSnapshot(state, {
+          bossState: callbacks.bossState || null,
+          checkpointNumber: litCount,
+          checkpointLabel: cp.label || `Checkpoint ${litCount}`,
+        });
+        callbacks.onCheckpoint?.(cp, visitor, respawnPayload);
       } else if (!state.activeCheckpoint || state.activeCheckpoint.id !== cp.id) {
         state.activeCheckpoint = respawnPayload;
+        const litCount = state.checkpoints.filter((item) => item.activated).length;
+        state.checkpointSnapshot = captureCheckpointSnapshot(state, {
+          bossState: callbacks.bossState || null,
+          checkpointNumber: litCount,
+          checkpointLabel: cp.label || `Checkpoint ${litCount}`,
+        });
       }
     }
   }
 
-  // 7. Hazards & Patrol Enemy Collisions -> Cry-on-Death + Checkpoint Respawn
+  // 6b. Advance Weapon Pickups, Swings, Barrier Hits & Enemy/Boss Hits
+  stepWeaponTimers(state, dt, callbacks);
+
+  // 6c. In-World Puzzles, Escape Gauntlets, Secondary Grotesque Monsters, Health Orbs, Companion Cat & Foliage Spring Physics
+  stepPuzzles(state, dt, callbacks);
+  stepEscapeSequence(state, dt, callbacks);
+  stepSecondaryMonsters(state, dt, callbacks);
+  stepHealthOrbsAndCombatTexts(state, dt, callbacks);
+  if (state.cat) {
+    stepCompanionCat(state.cat, state, callbacks.mechState || null, dt, callbacks, solids);
+  }
+  if (Array.isArray(state.foliage) && state.foliage.length > 0) {
+    const foliageMovers = state.cat && state.cat.discovered
+      ? [...actorList, ...(state.monsters || []), state.cat]
+      : [...actorList, ...(state.monsters || [])];
+    stepFoliageSystem(
+      state.foliage,
+      foliageMovers,
+      dt,
+      state.physicsMode || 'normal',
+      [...(state.weaponEffects || []), ...(state.monsterProjectiles || []), ...(state.arrowProjectiles || [])]
+    );
+  }
+
+  // 7. Hazards & Patrol Enemy Collisions -> Tactile Health Damage & Knockback
   for (let i = 0; i < actorList.length; i++) {
     const actor = actorList[i];
-    if (actor.hurtTimer > 0 || actor.invulnTimer > 0) continue;
-    const partner = actor.id === 'madjid' ? state.actors.nadine : state.actors.madjid;
+    if (actor.hurtTimer > 0 || actor.invulnTimer > 0 || actor.phaseDash?.active) continue;
 
-    let hitDanger = false;
+    let hitSource = null;
     for (let h = 0; h < state.hazards.length; h++) {
       const hz = state.hazards[h];
+      if (!isHazardActive(hz, state.elapsed)) continue;
       const hzBox = { x: hz.x + 4, y: hz.y + 3, w: Math.max(8, hz.w - 8), h: Math.max(6, hz.h - 3) };
       if (rectsOverlap(actor, hzBox)) {
-        hitDanger = true;
+        hitSource = { x: hz.x + hz.w * 0.5, damage: hz.damage || 20, cause: hz.kind || 'Hazard' };
         break;
       }
     }
 
-    if (!hitDanger) {
+    if (!hitSource) {
       for (let e = 0; e < state.enemies.length; e++) {
         const en = state.enemies[e];
+        if (en.stunTimer > 0) continue;
         const enBox = { x: en.x + 4, y: en.y + 4, w: Math.max(10, en.w - 8), h: Math.max(10, en.h - 4) };
         if (rectsOverlap(actor, enBox)) {
-          hitDanger = true;
+          hitSource = { x: en.x + en.w * 0.5, damage: 22, cause: 'Creature' };
           break;
         }
       }
     }
 
-    if (hitDanger) {
-      triggerActorCry(state, actor, partner, callbacks, false);
+    if (hitSource) {
+      applyActorDamage(
+        state,
+        actor,
+        hitSource.damage,
+        { sourceX: hitSource.x, knockbackY: -225, cause: hitSource.cause },
+        callbacks
+      );
     }
   }
 
@@ -857,7 +1710,7 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
     sw.pressDepth = approach(sw.pressDepth, isSwitchActive(sw) ? 1 : 0, dt * 10);
   }
 
-  // 9. Key Pickups & Exit Portal Unlock
+  // 9. Key Pickups & Boss-Gated Exit Portal Unlock
   for (let i = 0; i < state.keys.length; i++) {
     const key = state.keys[i];
     if (key.collected) continue;
@@ -867,11 +1720,12 @@ export function stepSimulation(state, inputsByChar, rawDt, callbacks = {}) {
       key.collected = true;
       state.keysCollected += 1;
       callbacks.onKeyPickup?.(key, picker);
-      if (!state.portalUnlocked && state.keysCollected >= state.keysRequired) {
-        state.portalUnlocked = true;
-        callbacks.onPortalUnlock?.(state.exit);
-      }
     }
+  }
+  const shouldUnlockNow = computePortalUnlocked(state);
+  if (shouldUnlockNow && !state.portalUnlocked) {
+    state.portalUnlocked = true;
+    callbacks.onPortalUnlock?.(state.exit);
   }
 
   // 10. Exit Portal Check (Requires BOTH Madjid and Nadine Inside When Unlocked)
@@ -1246,6 +2100,27 @@ function drawCheckpoint(ctx, cp, time) {
   ctx.fill();
   ctx.stroke();
 
+  // Locked seal sigil when gated behind an unsolved world puzzle
+  if (cp.requiresPuzzleId && !lit) {
+    const bob = Math.sin(time * 3.2 + cp.x * 0.02) * 2;
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.24)';
+    ctx.beginPath();
+    ctx.arc(0, -64 + bob, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#FBBF24';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, -67 + bob, 3.8, Math.PI, 0);
+    ctx.stroke();
+    ctx.fillStyle = '#FDE68A';
+    ctx.strokeStyle = '#1E182E';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(-5.5, -67 + bob, 11, 8.5, 2.5);
+    ctx.fill();
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -1402,6 +2277,21 @@ function drawEnemy(ctx, en, time) {
     ctx.stroke();
   }
 
+  if (en.stunTimer > 0) {
+    ctx.fillStyle = '#FDE047';
+    ctx.strokeStyle = '#1E1B3A';
+    ctx.lineWidth = 1.3;
+    for (let s = 0; s < 3; s++) {
+      const ang = time * 6.5 + (s * Math.PI * 2) / 3;
+      const sx = Math.cos(ang) * 11;
+      const sy = -21 + Math.sin(ang) * 3.5;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
   ctx.restore();
 }
 
@@ -1520,8 +2410,13 @@ function drawExitPortal(ctx, state, time) {
 
   const pipY = exit.y - 14;
   const bothNeeded = portalUnlocked;
+  const bossLocked = Boolean(state.exit?.requiresBossDefeat && !state.bossDefeated);
   const labelText = !portalUnlocked
-    ? `Need ${keysRequired - keysCollected} Key${keysRequired - keysCollected > 1 ? 's' : ''}`
+    ? keysCollected < keysRequired
+      ? `Need ${keysRequired - keysCollected} Key${keysRequired - keysCollected > 1 ? 's' : ''}`
+      : bossLocked
+        ? 'Defeat Boss!'
+        : 'Locked'
     : actors.madjid.inPortal || actors.nadine.inPortal
       ? 'Waiting for Partner'
       : exit.isWeddingArch
@@ -1600,6 +2495,9 @@ function drawWorld(
   for (let i = 0; i < state.movingPlatforms.length; i++) {
     drawGuideRail(ctx, state.movingPlatforms[i]);
   }
+
+  // 2b. Grounded Ambient Contact Shadows underneath Elevated Ledges & Archways
+  drawTerrainContactShadows(ctx, state.platforms, state.worldHeight - 120, viewRange);
 
   // 3. Static Platforms, Pillars & Storybook Gatehouse Archways
   for (let i = 0; i < state.platforms.length; i++) {
@@ -1687,14 +2585,54 @@ function drawWorld(
     );
   }
 
-  // 5. Checkpoints
-  for (let i = 0; i < state.checkpoints.length; i++) {
-    drawCheckpoint(ctx, state.checkpoints[i], time);
+  // 4c. Interactive Spring-Physics Biome Foliage
+  renderFoliagePatches(ctx, state.foliage, time, viewRange);
+
+  // 5. Checkpoints & Biome Climbable Ladders
+  for (let c = 0; c < state.checkpoints.length; c++) {
+    drawCheckpoint(ctx, state.checkpoints[c], time);
+  }
+  const ladders = state.ladders || [];
+  for (let i = 0; i < ladders.length; i++) {
+    drawLadder(ctx, ladders[i], worldTheme, time, viewRange);
   }
 
-  // 6. Hazards (Thorns, Spikes, Crystal Shards)
+  // 6. Ocean Currents, Volcanic Thermal Vents, Hazards & Arrow Traps
+  const currents = state.oceanCurrents || [];
+  for (let i = 0; i < currents.length; i++) {
+    drawOceanCurrent(ctx, currents[i], time, viewRange);
+  }
+  const vents = state.thermalVents || [];
+  for (let i = 0; i < vents.length; i++) {
+    drawThermalVent(ctx, vents[i], time, viewRange);
+  }
   for (let i = 0; i < state.hazards.length; i++) {
     drawHazardObstacle(ctx, state.hazards[i], time, viewRange);
+  }
+  if (state.escapeState) {
+    drawEscapeSurge(ctx, state.escapeState, state.worldHeight, time);
+  }
+  const traps = state.arrowTraps || [];
+  for (let i = 0; i < traps.length; i++) {
+    drawArrowTrap(ctx, traps[i], time, viewRange);
+  }
+  const dynamicTraps = state.dynamicTraps || [];
+  const isNightLighting = bgSystem.getTimeOfDayMode?.() === 'night';
+  for (let i = 0; i < dynamicTraps.length; i++) {
+    const dtTrap = dynamicTraps[i];
+    if (isNightLighting && dtTrap.phase !== 'collapsed') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.14)';
+      ctx.beginPath();
+      ctx.roundRect(dtTrap.x - 4, dtTrap.y - 4, (dtTrap.w || 48) + 8, (dtTrap.h || 16) + 8, 6);
+      ctx.fill();
+      ctx.restore();
+    }
+    drawDynamicTrap(ctx, dtTrap, worldTheme, time, viewRange);
+  }
+  const arrowProjs = state.arrowProjectiles || [];
+  for (let i = 0; i < arrowProjs.length; i++) {
+    drawArrowProjectile(ctx, arrowProjs[i], time, viewRange);
   }
 
   // 7. Moving Platforms
@@ -1707,33 +2645,54 @@ function drawWorld(
     drawMovingPlatform(ctx, mp, time, isPowered);
   }
 
-  // 8. Sliding Gates
+  // 8. Sliding Gates, Tool-Gated Barriers & Breakable Barriers
   for (let i = 0; i < state.gates.length; i++) {
     drawGateBarrier(ctx, state.gates[i], state, time, isSwitchActive);
   }
+  drawFragileBarriers(ctx, state, time);
+  const toolBarriers = state.fragileBarriers || [];
+  for (let i = 0; i < toolBarriers.length; i++) {
+    const tb = toolBarriers[i];
+    if (!tb.broken && tb.material) {
+      renderToolBarrier(ctx, tb, time);
+    }
+  }
 
-  // 9. Pressure Switches (Hold Plates & Toggle Latches)
+  // 9. Pressure Switches, Carry Pedestals & In-World Canvas2D Logic Puzzles
   for (let i = 0; i < state.switches.length; i++) {
     const sw = state.switches[i];
     drawSwitchMechanism(ctx, sw, isSwitchActive(sw), time);
   }
+  const carryPedestals = state.carryPedestals || [];
+  const carryBlocks = state.carryBlocks || [];
+  for (let i = 0; i < carryPedestals.length; i++) {
+    const ped = carryPedestals[i];
+    const isPowered = carryBlocks.some((b) => b.placedPedestalId === ped.id);
+    drawCarryPedestal(ctx, ped, isPowered, time, viewRange);
+  }
+  renderPuzzles(ctx, state, time, viewRange);
 
   // 10. Exit Portal
   if (!state.exit.hidden) {
     drawExitPortal(ctx, state, time);
   }
 
-  // 11. Collectible Keys
+  // 11. Collectible Keys, Carry Relic Blocks & Weapons
   for (let i = 0; i < state.keys.length; i++) {
     const key = state.keys[i];
     if (key.collected) continue;
     drawKeyIconWorld(ctx, key.x, key.y, key.color, time, key.bobPhase);
   }
+  for (let i = 0; i < carryBlocks.length; i++) {
+    drawCarryBlock(ctx, carryBlocks[i], time, viewRange);
+  }
+  drawWeaponPickups(ctx, state, time);
 
-  // 12. Patrol Enemies
+  // 12. Patrol Enemies, Grotesque Secondary Monsters & Projectiles
   for (let i = 0; i < state.enemies.length; i++) {
     drawEnemy(ctx, state.enemies[i], time);
   }
+  renderMonstersAndProjectiles(ctx, state, time, viewRange);
 
   // 12b. Scenic Photo Spots
   if (extras?.photoSpots) {
@@ -1750,9 +2709,94 @@ function drawWorld(
     renderSoulLinkAura(ctx, state, extras.mechState, time);
   }
 
-  // 13. Madjid & Nadine Characters (Rendered Exclusively via src/skins.js)
+  // 12e. Living Lobby Campfire Overlook Props (only rendered on Title / Journey Hub backdrop)
+  if (!showIndicators && !state.isOpenWorld) {
+    const campX = 186;
+    const campY = 600;
+    ctx.save();
+    // Warm flickering radial campfire light on grass & characters
+    const flicker = 1 + Math.sin(time * 9.4) * 0.06;
+    const fireGlow = ctx.createRadialGradient(campX, campY - 14, 4, campX, campY - 12, 86 * flicker);
+    fireGlow.addColorStop(0, 'rgba(253, 224, 71, 0.32)');
+    fireGlow.addColorStop(0.55, 'rgba(251, 146, 60, 0.14)');
+    fireGlow.addColorStop(1, 'rgba(251, 146, 60, 0)');
+    ctx.fillStyle = fireGlow;
+    ctx.beginPath();
+    ctx.arc(campX, campY - 12, 86 * flicker, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Travel trunk & warm campsite lantern behind Madjid
+    ctx.fillStyle = '#6B442A';
+    ctx.strokeStyle = '#1E182E';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(78, campY - 22, 30, 22, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#F5B95B';
+    ctx.fillRect(82, campY - 13, 22, 3);
+
+    // Crossed logs & river stones
+    ctx.fillStyle = '#4A2E20';
+    ctx.beginPath();
+    ctx.roundRect(campX - 16, campY - 7, 32, 7, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    for (let st = -2; st <= 2; st++) {
+      ctx.fillStyle = st % 2 === 0 ? '#64748B' : '#475569';
+      ctx.beginPath();
+      ctx.ellipse(campX + st * 6.5, campY - 1.5, 4.2, 2.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Animated layered campfire flame
+    const flameH = 20 + Math.sin(time * 11.2) * 3.5;
+    ctx.fillStyle = '#F97316';
+    ctx.beginPath();
+    ctx.moveTo(campX - 10, campY - 5);
+    ctx.quadraticCurveTo(campX - 8, campY - 16, campX + Math.sin(time * 8) * 2, campY - 5 - flameH);
+    ctx.quadraticCurveTo(campX + 8, campY - 16, campX + 10, campY - 5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#FDE047';
+    ctx.beginPath();
+    ctx.moveTo(campX - 5.5, campY - 5);
+    ctx.quadraticCurveTo(campX - 3, campY - 12, campX + Math.cos(time * 10) * 1.5, campY - 5 - flameH * 0.65);
+    ctx.quadraticCurveTo(campX + 4, campY - 12, campX + 5.5, campY - 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 13. Elevation-Aware Ground Shadows + Madjid, Nadine & Companion Cat
   const madjid = state.actors.madjid;
   const nadine = state.actors.nadine;
+  const activeCat = !showIndicators && extras?.lobbyCat ? extras.lobbyCat : state.cat;
+
+  drawActorContactShadow(ctx, madjid, state.platforms, state.movingPlatforms, state.worldHeight);
+  drawActorContactShadow(ctx, nadine, state.platforms, state.movingPlatforms, state.worldHeight);
+  if (activeCat) {
+    drawActorContactShadow(ctx, activeCat, state.platforms, state.movingPlatforms, state.worldHeight);
+  }
+
+  if (isNightLighting) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 226, 152, 0.14)';
+    ctx.beginPath();
+    ctx.arc(madjid.x + madjid.w * 0.5, madjid.y + madjid.h * 0.5, 42, 0, Math.PI * 2);
+    ctx.moveTo(nadine.x + nadine.w * 0.5 + 42, nadine.y + nadine.h * 0.5);
+    ctx.arc(nadine.x + nadine.w * 0.5, nadine.y + nadine.h * 0.5, 42, 0, Math.PI * 2);
+    if (activeCat && activeCat.discovered) {
+      ctx.moveTo(activeCat.x + 11 + 26, activeCat.y + 9);
+      ctx.arc(activeCat.x + 11, activeCat.y + 9, 26, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+
   const madjidSkin = getSkin('madjid', skinsSelected.madjid);
   const nadineSkin = getSkin('nadine', skinsSelected.nadine);
 
@@ -1769,8 +2813,14 @@ function drawWorld(
     });
   }
 
-  // 14. Pooled Particles Layer
+  if (activeCat) {
+    renderCompanionCat(ctx, activeCat, showIndicators ? state : null, time);
+  }
+
+  // 14. Pooled Particles, Health Orbs, Floating Combat Texts & Weapon Sparks
   particles.render(ctx);
+  renderHealthOrbsAndTexts(ctx, state, time);
+  drawWeaponSparks(ctx, state);
 
   // 14a. Grotesque Ugly Ghost, Cartoon Bones & Rare Idle Co-op Overlay
   if (extras?.mechState) {
@@ -1781,24 +2831,120 @@ function drawWorld(
   // 14b. Synchronized Waypoint Pings & Overhead Chat Speech Bubbles
   if (interactionState) {
     renderPingBeacons(ctx, interactionState, time);
-    renderOverheadBubbles(ctx, state.actors, interactionState);
+    renderOverheadBubbles(ctx, state.actors, interactionState, extras?.viewportBounds || null);
   }
 
-  // 15. Brief Rising World Callouts (e.g., "Checkpoint!")
+  // 14c. Grand Wedding Ceremony Deterministic Petals, Concentric Golden Hearts & Banner
+  if (extras?.weddingCeremony?.active) {
+    const wc = extras.weddingCeremony;
+    const progress = clamp(wc.timer / Math.max(0.1, wc.duration), 0, 1);
+    const archX = state.exit.x + state.exit.w * 0.5;
+    const archY = state.exit.y + state.exit.h * 0.5;
+    ctx.save();
+
+    // Soft golden concentric halo around the Coral Wedding Arch
+    const glowAlpha = Math.min(1, progress * 2.5) * 0.22;
+    ctx.fillStyle = `rgba(253, 230, 138, ${glowAlpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(archX, archY, 108 + Math.sin(time * 3) * 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Deterministic rose petals & rising golden hearts (zero Math.random() in render)
+    const petalColors = ['#F472B6', '#FDA4AF', '#FFF1F2', '#FDE68A'];
+    for (let i = 0; i < 18; i++) {
+      const seed = i * 1.618;
+      const fallT = (time * 0.34 + i * 0.083) % 1;
+      const px = archX + Math.sin(seed * 7 + time * 1.5) * 145 + (i - 8.5) * 8;
+      const py = state.exit.y - 90 + fallT * 210;
+      const rot = time * 2.2 + seed * 3;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(rot);
+      ctx.globalAlpha = Math.sin(fallT * Math.PI) * 0.9;
+      ctx.fillStyle = petalColors[i % petalColors.length];
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 5.2, 2.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    for (let h = 0; h < 6; h++) {
+      const riseT = (time * 0.45 + h * 0.166) % 1;
+      const hx = archX + Math.sin(time * 2.1 + h * 1.4) * 28;
+      const hy = state.exit.y + 18 - riseT * 78;
+      const s = 5.5 + Math.sin(h + time * 3) * 1.2;
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.globalAlpha = (1 - riseT) * 0.88;
+      ctx.fillStyle = h % 2 === 0 ? '#F472B6' : '#FDE047';
+      ctx.beginPath();
+      ctx.moveTo(0, s * 0.45);
+      ctx.bezierCurveTo(-s, -s * 0.25, -s * 0.6, -s * 1.1, 0, -s * 0.45);
+      ctx.bezierCurveTo(s * 0.6, -s * 1.1, s, -s * 0.25, 0, s * 0.45);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Celebratory banner above arch
+    const bannerY = state.exit.y - 54;
+    const bannerText = 'Madjid & Nadine · Married Beneath the Coral Arch ♥';
+    ctx.font = '800 13.5px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const bw = Math.max(260, ctx.measureText(bannerText).width + 30);
+    const bh = 32;
+    const bx = archX - bw * 0.5;
+    const by = bannerY - bh * 0.5;
+    ctx.globalAlpha = Math.min(1, progress * 3);
+    const bGrad = ctx.createLinearGradient(bx, by, bx, by + bh);
+    bGrad.addColorStop(0, 'rgba(30, 22, 54, 0.9)');
+    bGrad.addColorStop(1, 'rgba(88, 28, 66, 0.92)');
+    ctx.fillStyle = bGrad;
+    ctx.strokeStyle = 'rgba(253, 230, 138, 0.85)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, 16);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#FFF8D6';
+    ctx.fillText(bannerText, archX, bannerY + 0.5);
+
+    ctx.restore();
+  }
+
+  // 15. Brief Rising World Callouts (Slime Liquid Glass Capsules)
   if (worldToasts && worldToasts.length > 0) {
     ctx.save();
-    ctx.font = '700 13px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.font = '800 12.5px "Plus Jakarta Sans", system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
+    ctx.textBaseline = 'middle';
     for (let i = 0; i < worldToasts.length; i++) {
       const t = worldToasts[i];
       const alpha = clamp(t.life / t.maxLife, 0, 1);
       ctx.globalAlpha = alpha;
-      ctx.lineWidth = 3.2;
-      ctx.strokeStyle = 'rgba(20, 18, 36, 0.88)';
-      ctx.strokeText(t.text, t.x, t.y);
+      const tw = Math.max(70, ctx.measureText(t.text).width + 22);
+      const th = 26;
+      const rx = t.x - tw * 0.5;
+      const ry = t.y - th;
+
+      const glassGrad = ctx.createLinearGradient(rx, ry, rx, ry + th);
+      glassGrad.addColorStop(0, 'rgba(24, 34, 62, 0.86)');
+      glassGrad.addColorStop(1, 'rgba(12, 18, 36, 0.92)');
+      ctx.fillStyle = glassGrad;
+      ctx.strokeStyle = 'rgba(224, 242, 254, 0.45)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(rx, ry, tw, th, 13);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.beginPath();
+      ctx.roundRect(rx + 6, ry + 2.5, tw - 12, 4, 2);
+      ctx.fill();
+
       ctx.fillStyle = t.color;
-      ctx.fillText(t.text, t.x, t.y);
+      ctx.fillText(t.text, t.x, ry + th * 0.54);
     }
     ctx.restore();
   }
@@ -1813,9 +2959,41 @@ function bootstrapBrowserGame() {
   // DOM References
   const elTitleScreen = document.getElementById('title-screen');
   const elStoryPremise = document.getElementById('story-premise');
+  const elLobbyWorldMap = document.getElementById('lobby-world-map');
+  const elBtnStartJourney = document.getElementById('btn-start-journey');
+  const elBtnLobbyModeSolo = document.getElementById('btn-lobby-mode-solo');
+  const elBtnLobbyModeCoop = document.getElementById('btn-lobby-mode-coop');
+  const elBtnLobbyDay = document.getElementById('btn-lobby-day');
+  const elBtnLobbyNight = document.getElementById('btn-lobby-night');
+  const elBtnDrawerDay = document.getElementById('btn-drawer-day');
+  const elBtnDrawerNight = document.getElementById('btn-drawer-night');
+  const elBtnLobbyBgmToggle = document.getElementById('btn-lobby-bgm-toggle');
+  const elBtnLobbyBgmNext = document.getElementById('btn-lobby-bgm-next');
+  const elBtnLobbyTouchToggle = document.getElementById('btn-lobby-touch-toggle');
   const elHudLayer = document.getElementById('hud-layer');
+  const elHudChapterCluster = document.querySelector('.hud-chapter-cluster');
+  const elHudBtnCollapse = document.getElementById('hud-btn-collapse-hud');
   const elHudChapterNum = document.getElementById('hud-chapter-num');
   const elHudChapterTitle = document.getElementById('hud-chapter-title');
+  const elDedicationScreen = document.getElementById('dedication-screen');
+  const elBtnDedicationContinue = document.getElementById('btn-dedication-continue');
+  const elLobbyResumePrompt = document.getElementById('lobby-resume-prompt');
+  const elLobbyResumeKicker = document.getElementById('lobby-resume-kicker');
+  const elLobbyResumeSummary = document.getElementById('lobby-resume-summary');
+  const elBtnResumeSaved = document.getElementById('btn-resume-saved');
+  const elBtnResumeAlt = document.getElementById('btn-resume-alt');
+  const elBtnResumeFresh = document.getElementById('btn-resume-fresh');
+  const elBtnTitleInstall = document.getElementById('btn-title-install');
+  const elBtnPwaInstall = document.getElementById('btn-pwa-install');
+  const elOfflineIndicator = document.getElementById('offline-indicator');
+  const elIosInstallModal = document.getElementById('ios-install-modal');
+  const elBtnIosInstallClose = document.getElementById('btn-ios-install-close');
+  const elHudEscapeBanner = document.getElementById('hud-escape-banner');
+  const elHudEscapeTitle = document.getElementById('hud-escape-title');
+  const elHudEscapeTimer = document.getElementById('hud-escape-timer');
+  const elHudStoryWhisper = document.getElementById('hud-story-whisper');
+  const elHudStoryWhisperTitle = document.getElementById('hud-story-whisper-title');
+  const elHudStoryWhisperLine = document.getElementById('hud-story-whisper-line');
   const elHudCharBtn = document.getElementById('hud-switch-char');
   const elHudCharSwatch = document.getElementById('hud-char-swatch');
   const elHudCharName = document.getElementById('hud-char-name');
@@ -1849,7 +3027,54 @@ function bootstrapBrowserGame() {
   const elHudBtnCarry = document.getElementById('hud-btn-carry');
   const elHudCarryLabel = document.getElementById('hud-carry-label');
   const elHudBtnDance = document.getElementById('hud-btn-dance');
+  const elHudBtnDanceStyles = document.getElementById('hud-btn-dance-styles');
+  const elHudBtnDash = document.getElementById('hud-btn-dash');
+  const elHudDashCooldown = document.getElementById('hud-dash-cooldown');
+  const elHudBtnTouchToggle = document.getElementById('hud-btn-touch-toggle');
+  const elHudBtnSettings = document.getElementById('hud-btn-settings');
+  const elHudPing = document.getElementById('hud-ping');
+  const elHudHpMadjidFill = document.getElementById('hud-hp-madjid-fill');
+  const elHudHpMadjidVal = document.getElementById('hud-hp-madjid-val');
+  const elHudHpNadineFill = document.getElementById('hud-hp-nadine-fill');
+  const elHudHpNadineVal = document.getElementById('hud-hp-nadine-val');
+  const elHudTutorialHint = document.getElementById('hud-tutorial-hint');
+  const elLowHpVignette = document.getElementById('low-hp-vignette');
+
+  const elSettingsDrawer = document.getElementById('settings-drawer');
+  const elBtnCloseSettings = document.getElementById('btn-close-settings');
+  const elDrawerRoomSummary = document.getElementById('drawer-room-summary');
+  const elDrawerBtnOpenWorld = document.getElementById('drawer-btn-openworld');
+  const elDrawerMuteLabel = document.getElementById('drawer-mute-label');
+  const elDrawerBtnBgmToggle = document.getElementById('drawer-btn-bgm-toggle');
+  const elDrawerBgmToggleLabel = document.getElementById('drawer-bgm-toggle-label');
+  const elDrawerBtnBgmNext = document.getElementById('drawer-btn-bgm-next');
+  const elDrawerBgmTrackLabel = document.getElementById('drawer-bgm-track-label');
+  const elDrawerBtnLeaveRoom = document.getElementById('drawer-btn-leave-room');
+  const elDrawerWorldsList = document.getElementById('drawer-worlds-list');
+  const elBtnDrawerWorldsModal = document.getElementById('btn-drawer-worlds-modal');
+  const elDrawerBtnResetProgress = document.getElementById('drawer-btn-reset-progress');
+  const elDrawerBtnTouchCycle = document.getElementById('drawer-btn-touch-cycle');
+
+  const elStudioPreviewCanvas = document.getElementById('studio-preview-canvas');
+  const elStudioImageUpload = document.getElementById('studio-image-upload');
+  const elStudioScanStatus = document.getElementById('studio-scan-status');
+  const elStudioSkinName = document.getElementById('studio-skin-name');
+  const elStudioBodyColor = document.getElementById('studio-body-color');
+  const elStudioAccentColor = document.getElementById('studio-accent-color');
+  const elStudioPattern = document.getElementById('studio-pattern');
+  const elStudioHeadgear = document.getElementById('studio-headgear');
+  const elStudioAura = document.getElementById('studio-aura');
+  const elBtnStudioSave = document.getElementById('btn-studio-save');
+
+  const elTryAgainModal = document.getElementById('try-again-modal');
+  const elTryAgainReason = document.getElementById('try-again-reason');
+  const elBtnTryAgainRespawn = document.getElementById('btn-try-again-respawn');
+  const elBtnTryAgainRestart = document.getElementById('btn-try-again-restart');
+
   const elHudBtnPhoto = document.getElementById('hud-btn-photo');
+  const elHudBtnWeapon = document.getElementById('hud-btn-weapon');
+  const elHudWeaponLabel = document.getElementById('hud-weapon-label');
+  const elHudBtnWeaponNext = document.getElementById('hud-btn-weapon-next');
   const elHudBtnScrapbook = document.getElementById('hud-btn-scrapbook');
   const elScrapbookBadge = document.getElementById('scrapbook-badge');
   const elHudBtnFullscreen = document.getElementById('hud-btn-fullscreen');
@@ -1886,8 +3111,15 @@ function bootstrapBrowserGame() {
   const elScrapbookGrid = document.getElementById('scrapbook-grid');
   const elScrapbookCount = document.getElementById('scrapbook-count');
   const elTouchControls = document.getElementById('touch-controls');
+  const elTouchHubToggle = document.getElementById('touch-hub-toggle');
   const elTouchSwitch = document.getElementById('touch-switch');
+  const elTouchDown = document.getElementById('touch-down');
+  const elTouchJump = document.getElementById('touch-jump');
   const elTouchActionE = document.getElementById('touch-action-e');
+  const elTouchWeapon = document.getElementById('touch-weapon');
+  const elTouchWeaponCycle = document.getElementById('touch-weapon-cycle');
+  const elTouchDance = document.getElementById('touch-dance');
+  const elTouchDash = document.getElementById('touch-dash');
 
   const elCoopModal = document.getElementById('coop-modal');
   const elCoopServerUrl = document.getElementById('coop-server-url');
@@ -1903,6 +3135,7 @@ function bootstrapBrowserGame() {
   const elCoopSearchForm = document.getElementById('coop-search-form');
   const elCoopSearchInput = document.getElementById('coop-search-input');
   const elCoopRoomsList = document.getElementById('coop-rooms-list');
+  const elBtnCoopQuickJoin = document.getElementById('btn-coop-quick-join');
   const elHudBtnCoop = document.getElementById('hud-btn-coop');
 
   const elSoundOn = document.getElementById('icon-sound-on');
@@ -1913,7 +3146,16 @@ function bootstrapBrowserGame() {
 
   // Persistent Local Preferences (Skins & Cleared Levels across 10 Worlds / 50 Stages)
   const audio = createAudioEngine();
-  const bgSystem = createBackgroundSystem('sunrise');
+  let initialTimeOfDay = 'day';
+  try {
+    const savedTod = window.localStorage.getItem('nadine_time_of_day_v1');
+    if (savedTod === 'day' || savedTod === 'night') {
+      initialTimeOfDay = savedTod;
+    }
+  } catch {
+    initialTimeOfDay = 'day';
+  }
+  const bgSystem = createBackgroundSystem('sunrise', initialTimeOfDay);
   const particles = createParticlePool(180);
   const worldToasts = [];
   const interactionState = createInteractionState();
@@ -1930,6 +3172,12 @@ function bootstrapBrowserGame() {
     if (worldToasts.length > 8) worldToasts.shift();
   }
 
+  loadSavedCustomSkins().forEach((customSkin) => {
+    registerSkin(customSkin);
+  });
+
+  let qualityPreset = 'high';
+  let timeOfDayMode = initialTimeOfDay;
   let selectedSkins = {
     madjid: getDefaultSkinId('madjid'),
     nadine: getDefaultSkinId('nadine'),
@@ -1937,6 +3185,10 @@ function bootstrapBrowserGame() {
   const clearedLevelIds = new Set();
 
   try {
+    const savedQuality = window.localStorage.getItem('nadine_quality_preset');
+    if (savedQuality === 'not_bad' || savedQuality === 'good' || savedQuality === 'high') {
+      qualityPreset = savedQuality;
+    }
     const savedSkins = window.localStorage.getItem('nadine_selected_skins');
     if (savedSkins) {
       const parsed = JSON.parse(savedSkins);
@@ -1960,13 +3212,42 @@ function bootstrapBrowserGame() {
     try {
       window.localStorage.setItem('nadine_selected_skins', JSON.stringify(selectedSkins));
       window.localStorage.setItem('nadine_cleared_levels', JSON.stringify(Array.from(clearedLevelIds)));
+      window.localStorage.setItem('nadine_quality_preset', qualityPreset);
+      window.localStorage.setItem('nadine_time_of_day_v1', timeOfDayMode);
+      saveProgression(window.localStorage, progressionState);
     } catch {
       // Ignore storage errors
     }
   }
 
+  let progressionState = loadProgression(window.localStorage, clearedLevelIds);
+  let lobbySelectedWorldId = Math.min(WORLDS.length, Math.max(1, progressionState.highestUnlockedWorld || 1));
+  let lobbyModeChoice = 'solo'; // 'solo' | 'coop'
+  let storyState = createStorylineState(1);
+  let resetProgressArmed = false;
+  let resetProgressArmTimer = null;
+  const lobbyCat = {
+    name: 'Mimi',
+    discovered: true,
+    x: 158,
+    y: 582,
+    w: 22,
+    h: 18,
+    vx: 0,
+    vy: 0,
+    facing: 1,
+    grounded: true,
+    mood: 'purring',
+    idleAction: 'purr',
+    blinkTimer: 2,
+    walkDist: 0,
+    helmetActive: false,
+    alertTimer: 0,
+    heartTimer: 0,
+  };
+
   // Core Game State Machine
-  let gameState = 'title'; // 'title' | 'playing' | 'paused' | 'gameover'
+  let gameState = 'dedication'; // 'dedication' | 'title' | 'playing' | 'paused' | 'gameover'
   let activeSubModal = null; // 'skins' | 'chapters' | 'chapter-clear' | 'coop' | null
   let modalReturnState = 'title';
   let playMode = 'story'; // 'story' | 'openworld'
@@ -1983,19 +3264,67 @@ function bootstrapBrowserGame() {
   let cameraY = 0;
   let cameraLookAheadX = 0;
   let captionTimeoutId = null;
+  let dedicationAutoTimer = null;
+  let autoRespawnTimer = 0;
+  let deferredInstallPrompt = /** @type {any} */ (null);
   let titleHeartTimer = 1.6;
-  let touchPadMode = 'auto';
+  let lobbyCampEmberTimer = 0.25;
+  let touchPadMode = 'on';
+  let hudCollapsed = false;
+  let touchHubExpanded = false;
+  let lastCheckpointLockedToastAt = 0;
+  let lastMicroParticleAt = 0;
+  let lastRunDustAt = 0;
+  let lastSectorCode = '';
 
-  // Unified Cooperative Mechanics, Boss, Weather & Scrapbook State
+  try {
+    hudCollapsed = window.localStorage.getItem('nadine_hud_collapsed') === '1';
+    const savedPad = window.localStorage.getItem('nadine_touch_pad_mode');
+    if (savedPad === 'auto' || savedPad === 'on' || savedPad === 'off') {
+      touchPadMode = savedPad;
+    }
+  } catch {
+    hudCollapsed = false;
+  }
+
+  function applyHudCollapseState() {
+    elHudChapterCluster?.classList.toggle('is-collapsed', hudCollapsed);
+    if (elHudBtnCollapse) {
+      elHudBtnCollapse.setAttribute('aria-expanded', String(!hudCollapsed));
+      elHudBtnCollapse.setAttribute('title', hudCollapsed ? 'Expand World HUD (H)' : 'Collapse World HUD (H)');
+      elHudBtnCollapse.textContent = hudCollapsed ? '+' : '−';
+    }
+  }
+  applyHudCollapseState();
+
+  function toggleHudCollapsed(force = null) {
+    hudCollapsed = force === null ? !hudCollapsed : Boolean(force);
+    try {
+      window.localStorage.setItem('nadine_hud_collapsed', hudCollapsed ? '1' : '0');
+    } catch {
+      // Ignore storage failures
+    }
+    applyHudCollapseState();
+  }
+
+  function toggleTouchActionHub(force = null) {
+    touchHubExpanded = force === null ? !touchHubExpanded : Boolean(force);
+    elTouchControls?.classList.toggle('touch-hub-expanded', touchHubExpanded);
+    elTouchHubToggle?.setAttribute('aria-expanded', String(touchHubExpanded));
+  }
+
+  // Unified Cooperative Mechanics, Boss, Weather, Wedding Ceremony & Scrapbook State
   let mechState = createMechanicsState();
   let bossState = null;
+  let weddingCeremony = null;
   let photoSpots = [];
   let activePhotoSpot = null;
   let scrapbookPhotos = loadLocalScrapbook();
   let weatherMode = 'clear';
   let openWorldCycleTimer = 0;
   let shutterFlashAlpha = 0;
-  let currentCamScale = 1;
+  let currentCamScale = 1.26;
+  let currentZoomFactor = 1.26;
   let hasInitializedCam = false;
   let lastBossBroadcastSig = '';
   let lastGhostWarnSoundAt = 0;
@@ -2035,16 +3364,32 @@ function bootstrapBrowserGame() {
     inPortal: false,
     walkDist: 0,
     blushTimer: 0,
+    weapons: [],
+    equippedWeapon: null,
+    phaseDashActive: false,
+    phaseRippleTimer: 0,
+    weaponSwing: null,
   };
   let coopCreateModeChoice = 'story';
   let coopCreateCharChoice = 'madjid';
   let coopDirectoryRooms = [];
   let isApplyingRemoteUpdate = false;
   let lastCoopStateSendMs = 0;
+  let coopAdvanceTimer = null;
+  let pendingQuickJoin = false;
+  let pendingResumeRoomCode = null;
+  let resumePromptDismissed = false;
+
+  function clearCoopAdvanceTimer() {
+    if (coopAdvanceTimer) {
+      window.clearTimeout(coopAdvanceTimer);
+      coopAdvanceTimer = null;
+    }
+  }
 
   // Decoupled Input Hub (Keyboard + Multi-Touch + Network Remote Slot)
   const keysHeld = new Set();
-  const touchHeld = { left: false, right: false, jump: false };
+  const touchHeld = { left: false, right: false, down: false, jump: false };
   let localJumpJustPressed = false;
   let localJumpJustReleased = false;
   let prevJumpHeld = false;
@@ -2153,8 +3498,8 @@ function bootstrapBrowserGame() {
     {
       senderId: 'story',
       senderName: 'Storybook',
-      text: 'Welcome across 10 worlds! Press Tab to switch between Madjid and Nadine, or open Online Co-op to play together on two devices.',
-      timestamp: 'W1-1',
+      text: 'Welcome across 5 seamless Worlds! Press Tab to switch between Madjid and Nadine, Shift to Soul Dash, or open Online Co-op to play together.',
+      timestamp: 'W1',
     },
     { live: false }
   );
@@ -2183,6 +3528,7 @@ function bootstrapBrowserGame() {
     keysHeld.clear();
     touchHeld.left = false;
     touchHeld.right = false;
+    touchHeld.down = false;
     touchHeld.jump = false;
     localJumpJustPressed = false;
     localJumpJustReleased = false;
@@ -2192,10 +3538,189 @@ function bootstrapBrowserGame() {
 
   function syncMuteUI() {
     const muted = audio.isMuted();
-    elSoundOn.classList.toggle('hidden', muted);
-    elSoundOff.classList.toggle('hidden', !muted);
-    elMuteBtn.setAttribute('aria-pressed', String(muted));
-    elMuteBtn.setAttribute('aria-label', muted ? 'Unmute sound effects' : 'Mute sound effects');
+    const bgm = audio.getBgmState();
+    elSoundOn?.classList.toggle('hidden', muted);
+    elSoundOff?.classList.toggle('hidden', !muted);
+    if (elDrawerMuteLabel) {
+      elDrawerMuteLabel.textContent = muted ? 'Sound & Music: Off' : 'Sound & Music: On';
+    }
+    elMuteBtn?.setAttribute('aria-pressed', String(muted));
+    elMuteBtn?.setAttribute('aria-label', muted ? 'Unmute sound and music' : 'Mute sound and music');
+
+    if (elDrawerBgmToggleLabel) {
+      elDrawerBgmToggleLabel.textContent = bgm.musicEnabled ? 'Music: On' : 'Music: Off';
+    }
+    if (elDrawerBtnBgmToggle) {
+      elDrawerBtnBgmToggle.setAttribute('aria-pressed', String(bgm.musicEnabled));
+      elDrawerBtnBgmToggle.classList.toggle('is-accent', bgm.musicEnabled && !muted && !bgm.unavailable);
+    }
+    if (elDrawerBgmTrackLabel) {
+      elDrawerBgmTrackLabel.textContent = bgm.unavailable
+        ? 'Music Unavailable'
+        : `${bgm.trackIndex + 1}/${BGM_TRACKS.length} · ${bgm.trackTitle}`;
+    }
+    if (elDrawerBtnBgmNext) {
+      elDrawerBtnBgmNext.disabled = Boolean(bgm.unavailable);
+      elDrawerBtnBgmNext.setAttribute('aria-label', `Next background music track (current: ${bgm.trackTitle})`);
+    }
+    if (elBtnLobbyBgmToggle) {
+      const musicActive = bgm.musicEnabled && !muted && !bgm.unavailable;
+      elBtnLobbyBgmToggle.textContent = muted || !bgm.musicEnabled ? 'Music: Off' : 'Music: On';
+      elBtnLobbyBgmToggle.setAttribute('aria-pressed', String(musicActive));
+      elBtnLobbyBgmToggle.classList.toggle('is-active', musicActive);
+    }
+    if (elBtnLobbyBgmNext) {
+      elBtnLobbyBgmNext.disabled = Boolean(bgm.unavailable);
+      elBtnLobbyBgmNext.textContent = bgm.unavailable
+        ? 'Music Unavailable'
+        : `${bgm.trackIndex + 1}/${BGM_TRACKS.length} · ${bgm.trackTitle}`;
+      elBtnLobbyBgmNext.setAttribute('aria-label', `Switch soundtrack (current: ${bgm.trackTitle})`);
+    }
+  }
+
+  function syncStoryWhisperHud() {
+    if (!elHudStoryWhisper) return;
+    const activeBanner = gameState === 'playing' && !activeSubModal ? storyState?.banner : null;
+    elHudStoryWhisper.classList.toggle('hidden', !activeBanner);
+    if (activeBanner) {
+      if (elHudStoryWhisperTitle) elHudStoryWhisperTitle.textContent = activeBanner.title || '';
+      if (elHudStoryWhisperLine) elHudStoryWhisperLine.textContent = activeBanner.line || '';
+    }
+  }
+
+  function fireStoryBeat(eventType, { fromRemote = false } = {}) {
+    if (!storyState || playMode !== 'story') return null;
+    const worldId = LEVELS[currentLevelIdx]?.worldId || 1;
+    const res = triggerStoryEvent(
+      storyState,
+      eventType,
+      {
+        worldId,
+        fromRemote,
+        actors: levelState.actors,
+      },
+      interactionState,
+      {
+        onStoryBeat(payload) {
+          if (coopSession.active && !fromRemote) {
+            coopClient.sendStorySync({
+              event: 'story_beat',
+              beatId: payload.beatId,
+              eventType: payload.eventType,
+              worldId: payload.worldId,
+            });
+          }
+        },
+      }
+    );
+    syncStoryWhisperHud();
+    return res;
+  }
+
+  const WORLD_LOBBY_ACCENTS = {
+    1: '#6EE7B7',
+    2: '#7DD3FC',
+    3: '#FB923C',
+    4: '#C084FC',
+    5: '#38BDF8',
+  };
+
+  function syncLobbyModeButtons() {
+    if (elBtnLobbyModeSolo) {
+      const isSolo = lobbyModeChoice !== 'coop';
+      elBtnLobbyModeSolo.classList.toggle('is-active', isSolo);
+      elBtnLobbyModeSolo.setAttribute('aria-pressed', String(isSolo));
+    }
+    if (elBtnLobbyModeCoop) {
+      const isCoop = lobbyModeChoice === 'coop';
+      elBtnLobbyModeCoop.classList.toggle('is-active', isCoop);
+      elBtnLobbyModeCoop.setAttribute('aria-pressed', String(isCoop));
+    }
+    if (elBtnStartJourney) {
+      elBtnStartJourney.textContent =
+        lobbyModeChoice === 'coop'
+          ? `Open 2P Co-op · World ${lobbySelectedWorldId}`
+          : `Begin World ${lobbySelectedWorldId}`;
+    }
+  }
+
+  function renderLobbyWorldMap() {
+    if (!elLobbyWorldMap) return;
+    if (!isWorldUnlocked(progressionState, lobbySelectedWorldId)) {
+      lobbySelectedWorldId = Math.min(WORLDS.length, Math.max(1, progressionState.highestUnlockedWorld || 1));
+    }
+    elLobbyWorldMap.innerHTML = '';
+
+    WORLDS.forEach((world) => {
+      const status = getWorldProgressionStatus(progressionState, world.id);
+      const unlocked = isWorldUnlocked(progressionState, world.id);
+      const dangerous = isWorldDangerous(world.id);
+      const selected = world.id === lobbySelectedWorldId;
+
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.role = 'listitem';
+      card.disabled = !unlocked;
+      card.dataset.worldId = String(world.id);
+      card.style.setProperty('--world-accent', WORLD_LOBBY_ACCENTS[world.id] || '#FDE68A');
+      card.className = `lobby-world-card is-${status}${selected ? ' is-selected' : ''}`;
+      card.setAttribute('aria-pressed', String(selected));
+      card.setAttribute(
+        'aria-label',
+        `World ${world.id}: ${world.name}, ${status === 'locked' ? `Locked until World ${world.id - 1} is cleared` : status}${dangerous ? ', Dangerous Territory' : ''}`
+      );
+
+      const top = document.createElement('div');
+      top.className = 'lobby-world-top';
+      const codeEl = document.createElement('span');
+      codeEl.className = 'lobby-world-code';
+      codeEl.textContent = `W${world.id}`;
+      const statusEl = document.createElement('span');
+      statusEl.className = 'lobby-world-status';
+      statusEl.textContent = status === 'completed' ? 'Cleared ✓' : status === 'unlocked' ? 'Unlocked' : 'Locked';
+      top.appendChild(codeEl);
+      top.appendChild(statusEl);
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'lobby-world-name';
+      nameEl.textContent = world.name;
+
+      card.appendChild(top);
+      card.appendChild(nameEl);
+
+      if (!unlocked) {
+        const hintEl = document.createElement('span');
+        hintEl.className = 'lobby-world-hint';
+        hintEl.textContent = `Clear World ${world.id - 1}`;
+        card.appendChild(hintEl);
+      }
+      if (dangerous) {
+        const dangerEl = document.createElement('span');
+        dangerEl.className = 'lobby-world-danger';
+        dangerEl.textContent = 'Dangerous Territory';
+        card.appendChild(dangerEl);
+      }
+
+      card.addEventListener('click', (e) => {
+        if (!unlocked) return;
+        e.currentTarget.blur();
+        audio.unlock();
+        audio.playUiClick();
+        lobbySelectedWorldId = world.id;
+        bgSystem.setTheme(world.theme, false, {
+          landmark: world.landmark,
+          ambient: world.ambient,
+          platformPalette: world.platformPalette,
+          weather: getWeatherForWorld(world.id),
+        });
+        renderLobbyWorldMap();
+        syncLobbyModeButtons();
+      });
+
+      elLobbyWorldMap.appendChild(card);
+    });
+
+    syncLobbyModeButtons();
   }
 
   function applyCoopUiLock() {
@@ -2238,6 +3763,18 @@ function bootstrapBrowserGame() {
 
     if (elHudBtnCoop) {
       elHudBtnCoop.setAttribute('aria-pressed', String(locked));
+    }
+
+    if (elDrawerRoomSummary) {
+      if (locked && coopSession.roomCode) {
+        const who = activeCharId === 'madjid' ? 'Madjid' : 'Nadine';
+        elDrawerRoomSummary.textContent = `Room ${coopSession.roomCode} (${coopSession.room?.playerCount || 1}/2) · Playing as ${who}`;
+      } else {
+        elDrawerRoomSummary.textContent = 'Solo Mode · Progress saves automatically';
+      }
+    }
+    if (elDrawerBtnLeaveRoom) {
+      elDrawerBtnLeaveRoom.classList.toggle('hidden', !locked);
     }
   }
 
@@ -2375,9 +3912,311 @@ function bootstrapBrowserGame() {
     elScrapbookBadge.classList.toggle('hidden', count === 0);
   }
 
+  let studioTargetChar = 'madjid';
+
+  function syncHealthHud() {
+    const m = levelState.actors.madjid;
+    const n = levelState.actors.nadine;
+    const mMax = Math.max(1, m?.maxHp || 100);
+    const nMax = Math.max(1, n?.maxHp || 100);
+    const mHp = Math.max(0, Math.round(m?.hp ?? mMax));
+    const nHp = Math.max(0, Math.round(n?.hp ?? nMax));
+    const mPct = Math.max(0, Math.min(100, Math.round((mHp / mMax) * 100)));
+    const nPct = Math.max(0, Math.min(100, Math.round((nHp / nMax) * 100)));
+
+    if (elHudHpMadjidFill) {
+      elHudHpMadjidFill.style.width = `${mPct}%`;
+      elHudHpMadjidFill.classList.toggle('is-low', mHp > 0 && mPct < 30);
+    }
+    if (elHudHpMadjidVal) elHudHpMadjidVal.textContent = `${mHp}/${mMax}`;
+    if (elHudHpNadineFill) {
+      elHudHpNadineFill.style.width = `${nPct}%`;
+      elHudHpNadineFill.classList.toggle('is-low', nHp > 0 && nPct < 30);
+    }
+    if (elHudHpNadineVal) elHudHpNadineVal.textContent = `${nHp}/${nMax}`;
+
+    if (elLowHpVignette) {
+      const watchActor = coopSession.active && coopSession.localCharId ? levelState.actors[coopSession.localCharId] : levelState.actors[activeCharId];
+      const watchLow = Boolean(
+        gameState === 'playing' &&
+          !levelState.gameOver &&
+          watchActor &&
+          watchActor.hp > 0 &&
+          watchActor.hp / Math.max(1, watchActor.maxHp || 100) < 0.3
+      );
+      elLowHpVignette.classList.toggle('hidden', !watchLow);
+    }
+  }
+
+  function updateDashCooldownHud() {
+    const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    const actor = levelState.actors[myChar];
+    const cd = Math.max(0, actor?.dashCooldown || 0);
+    const ready = cd <= 0.02;
+    if (elHudDashCooldown) {
+      elHudDashCooldown.textContent = ready ? 'Shift' : `${cd.toFixed(1)}s`;
+    }
+    if (elHudBtnDash) {
+      elHudBtnDash.classList.toggle('is-ready', ready);
+      elHudBtnDash.classList.toggle('is-cooling', !ready);
+    }
+    if (elTouchDash) {
+      elTouchDash.classList.toggle('is-ready', ready);
+      const span = elTouchDash.querySelector('span');
+      if (span) span.textContent = ready ? 'Dash' : `${cd.toFixed(0)}s`;
+    }
+  }
+
+  let lastTutorialHintText = '';
+  function updateTutorialHint() {
+    if (!elHudTutorialHint) return;
+    if (gameState !== 'playing' || activeSubModal || levelState.gameOver) {
+      if (lastTutorialHintText !== '') {
+        lastTutorialHintText = '';
+        elHudTutorialHint.classList.add('hidden');
+      }
+      return;
+    }
+
+    const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    const actor = levelState.actors[myChar];
+    let hint = '';
+
+    if (actor) {
+      const acx = actor.x + actor.w * 0.5;
+      const acy = actor.y + actor.h * 0.5;
+
+      const nearPickup = (levelState.weaponPickups || []).find(
+        (p) => !p.collected && Math.hypot(acx - p.x, acy - p.y) <= 78
+      );
+      const nearPuzzle = (levelState.puzzles || []).find(
+        (pz) => !pz.solved && (pz.nodes || []).some((n) => Math.hypot(acx - (n.x + n.w * 0.5), acy - (n.y + n.h * 0.5)) <= 84)
+      );
+      const nearBlock = (levelState.carryBlocks || []).find(
+        (b) => !b.carriedBy && !b.placedPedestalId && Math.hypot(acx - (b.x + b.w * 0.5), acy - (b.y + b.h * 0.5)) <= 84
+      );
+      const nearBarrier = (levelState.fragileBarriers || []).find(
+        (b) => !b.broken && Math.hypot(acx - (b.x + b.w * 0.5), acy - (b.y + b.h * 0.5)) <= 105
+      );
+
+      if (actor.carryingBlockId) {
+        hint = 'Carry relic block onto a glowing Pedestal, then press E to set down';
+      } else if (nearPickup) {
+        const def = getWeaponDef(nearPickup.weaponId);
+        hint = `Press X to equip ${def.name}`;
+      } else if (nearPuzzle) {
+        if (nearPuzzle.kind === 'ordered_levers') {
+          hint = 'Inspect the Rune Mural and pull glowing levers in exact order (E)';
+        } else if (nearPuzzle.kind === 'conduit_locks') {
+          hint = 'Strike Energy Conduits with Energy Wand (X) or press E together';
+        } else if (nearPuzzle.kind === 'sync_plates') {
+          hint = 'Step onto BOTH Sync Plates together with Madjid & Nadine!';
+        } else {
+          hint = 'Press E near each rotating pillar to align matching symbols';
+        }
+      } else if (nearBlock) {
+        hint = 'Press E to lift heavy stone relic block';
+      } else if (nearBarrier && nearBarrier.material) {
+        const toolName = nearBarrier.requiredWeapon === 'crystal_hammer'
+          ? 'Crystal Hammer'
+          : nearBarrier.requiredWeapon === 'energy_wand'
+            ? 'Energy Wand'
+            : 'Light Sword';
+        hint = `Strike ${nearBarrier.material} barrier with ${toolName} (X)`;
+      } else if (isBossEngaged(levelState, bossState)) {
+        hint = bossState.shielded
+          ? 'Stand close or strike together to shatter the Boss Shield!'
+          : 'Boss Shield down! Jump on crown or attack with your weapon (X)';
+      }
+    }
+
+    if (hint !== lastTutorialHintText) {
+      lastTutorialHintText = hint;
+      if (hint) {
+        elHudTutorialHint.textContent = hint;
+        elHudTutorialHint.classList.remove('hidden');
+      } else {
+        elHudTutorialHint.classList.add('hidden');
+      }
+    }
+  }
+
+  function applyQualityPreset(nextPreset) {
+    if (nextPreset !== 'not_bad' && nextPreset !== 'good' && nextPreset !== 'high') return;
+    qualityPreset = nextPreset;
+    savePreferences();
+    document.querySelectorAll('[data-quality-preset]').forEach((btn) => {
+      const active = btn.dataset.qualityPreset === qualityPreset;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
+    resizeCanvas();
+  }
+
+  function applyTimeOfDayMode(nextMode, { instant = false, broadcast = false } = {}) {
+    timeOfDayMode = nextMode === 'night' ? 'night' : 'day';
+    bgSystem.setTimeOfDayMode(timeOfDayMode, instant);
+    savePreferences();
+
+    const isNight = timeOfDayMode === 'night';
+    if (elBtnLobbyDay) {
+      elBtnLobbyDay.classList.toggle('is-active', !isNight);
+      elBtnLobbyDay.setAttribute('aria-pressed', String(!isNight));
+    }
+    if (elBtnLobbyNight) {
+      elBtnLobbyNight.classList.toggle('is-active', isNight);
+      elBtnLobbyNight.setAttribute('aria-pressed', String(isNight));
+    }
+    if (elBtnDrawerDay) {
+      elBtnDrawerDay.classList.toggle('active', !isNight);
+      elBtnDrawerDay.setAttribute('aria-pressed', String(!isNight));
+    }
+    if (elBtnDrawerNight) {
+      elBtnDrawerNight.classList.toggle('active', isNight);
+      elBtnDrawerNight.setAttribute('aria-pressed', String(isNight));
+    }
+
+    if (broadcast && coopSession.active && !isApplyingRemoteUpdate) {
+      coopClient.sendStorySync({
+        event: 'time_of_day',
+        timeOfDayMode,
+      });
+    }
+  }
+
+  function renderDrawerWorldsList() {
+    if (!elDrawerWorldsList) return;
+    elDrawerWorldsList.innerHTML = '';
+    WORLDS.forEach((world) => {
+      const idx = LEVELS.findIndex((l) => l.worldId === world.id);
+      if (idx < 0) return;
+      const lvl = LEVELS[idx];
+      const unlocked = isWorldUnlocked(progressionState, world.id);
+      const dangerous = isWorldDangerous(world.id);
+      const isCurrent = playMode === 'story' && idx === currentLevelIdx;
+      const isCleared = clearedLevelIds.has(lvl.id) || getWorldProgressionStatus(progressionState, world.id) === 'completed';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.disabled = !unlocked;
+      btn.className = `drawer-world-btn${isCurrent ? ' active' : ''}${!unlocked ? ' is-locked' : ''}${dangerous && unlocked ? ' is-danger' : ''}`;
+      btn.innerHTML = `<span><strong>W${world.id}</strong> · ${world.name}</span><span class="drawer-world-status">${!unlocked ? 'Locked' : isCurrent ? 'Playing' : isCleared ? 'Cleared' : dangerous ? 'Danger · Go' : 'Go'}</span>`;
+      btn.addEventListener('click', (e) => {
+        if (!unlocked) return;
+        e.currentTarget.blur();
+        toggleSettingsDrawer(false);
+        startNewGame(idx);
+      });
+      elDrawerWorldsList.appendChild(btn);
+    });
+  }
+
+  function renderStudioPreview() {
+    if (!elStudioPreviewCanvas) return;
+    const draft = buildCustomSkinConfig({
+      character: studioTargetChar,
+      name: elStudioSkinName?.value || 'Custom Look',
+      body: elStudioBodyColor?.value || '#5E85E6',
+      accent: elStudioAccentColor?.value || '#FDE047',
+      pattern: elStudioPattern?.value || 'solid',
+      headgear: elStudioHeadgear?.value || 'none',
+      aura: elStudioAura?.value || 'none',
+      id: `__preview-${studioTargetChar}`,
+    });
+    registerSkin(draft);
+    renderSkinPreview(elStudioPreviewCanvas, studioTargetChar, draft.id, elapsedTime);
+  }
+
+  async function applyStudioFile(file) {
+    if (!file) return;
+    if (elStudioScanStatus) elStudioScanStatus.textContent = 'Scanning 2D art palette...';
+    try {
+      const analyzed = await analyzeImageFileToSkin(file, {
+        character: studioTargetChar,
+        name: elStudioSkinName?.value || `${studioTargetChar === 'madjid' ? 'Madjid' : 'Nadine'} Scan`,
+      });
+      if (elStudioBodyColor && analyzed.palette?.body) elStudioBodyColor.value = analyzed.palette.body;
+      if (elStudioAccentColor && analyzed.accent) elStudioAccentColor.value = analyzed.accent;
+      if (elStudioPattern && analyzed.pattern) elStudioPattern.value = analyzed.pattern;
+      if (elStudioSkinName && analyzed.name) elStudioSkinName.value = analyzed.name;
+      if (elStudioScanStatus) {
+        elStudioScanStatus.textContent = `Extracted ${analyzed.palette.body} & ${analyzed.pattern} pattern!`;
+      }
+      renderStudioPreview();
+    } catch {
+      if (elStudioScanStatus) {
+        elStudioScanStatus.textContent = 'Could not read image; try another PNG/JPG.';
+      }
+    }
+  }
+
+  function saveStudioSkin() {
+    audio.unlock();
+    audio.playKeyPickup();
+    const built = buildCustomSkinConfig({
+      character: studioTargetChar,
+      name: elStudioSkinName?.value || 'Custom Look',
+      body: elStudioBodyColor?.value || '#5E85E6',
+      accent: elStudioAccentColor?.value || '#FDE047',
+      pattern: elStudioPattern?.value || 'solid',
+      headgear: elStudioHeadgear?.value || 'none',
+      aura: elStudioAura?.value || 'none',
+    });
+    registerSkin(built);
+    saveCustomSkinToStorage(built);
+    selectedSkins[studioTargetChar] = built.id;
+    savePreferences();
+    if (coopSession.active) {
+      coopClient.sendCustomSkinSave(built);
+      if (studioTargetChar === coopSession.localCharId) {
+        coopClient.sendSkinUpdate(built.id);
+      }
+    }
+    syncHudStatic();
+    renderSkinGrid();
+    renderStudioPreview();
+    if (elStudioScanStatus) {
+      elStudioScanStatus.textContent = `Equipped "${built.name}" on ${studioTargetChar === 'madjid' ? 'Madjid' : 'Nadine'}!`;
+    }
+  }
+
+  function switchDrawerTab(tabId = 'room') {
+    document.querySelectorAll('[data-drawer-tab]').forEach((btn) => {
+      const active = btn.dataset.drawerTab === tabId;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', String(active));
+    });
+    document.querySelectorAll('[data-drawer-panel]').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.drawerPanel !== tabId);
+    });
+    if (tabId === 'worlds') renderDrawerWorldsList();
+    if (tabId === 'studio') renderStudioPreview();
+  }
+
+  function toggleSettingsDrawer(forceOpen = null) {
+    if (!elSettingsDrawer) return;
+    const currentlyOpen = !elSettingsDrawer.classList.contains('hidden');
+    const nextOpen = forceOpen === null ? !currentlyOpen : Boolean(forceOpen);
+    elSettingsDrawer.classList.toggle('hidden', !nextOpen);
+    elHudBtnSettings?.setAttribute('aria-expanded', String(nextOpen));
+    if (nextOpen) {
+      toggleDancePopover(false);
+      renderDrawerWorldsList();
+      renderStudioPreview();
+    }
+  }
+
+  function isBossEngaged(state, boss) {
+    if (!boss || !boss.active || boss.defeated) return false;
+    if (boss.isOpenWorld) return true;
+    const m = state?.actors?.madjid;
+    const n = state?.actors?.nadine;
+    const minTriggerX = (boss.minX ?? boss.x - 280) - 200;
+    return Boolean((m && m.x >= minTriggerX) || (n && n.x >= minTriggerX));
+  }
+
   function syncBossBarHud() {
     if (!elHudBossBar) return;
-    const visible = gameState === 'playing' && Boolean(bossState && bossState.active && !bossState.defeated);
+    const visible = gameState === 'playing' && isBossEngaged(levelState, bossState);
     elHudBossBar.classList.toggle('hidden', !visible);
     if (!visible) return;
     const pct = Math.max(0, Math.min(100, Math.round((bossState.hp / bossState.maxHp) * 100)));
@@ -2402,42 +4241,67 @@ function bootstrapBrowserGame() {
     }
   }
 
+  let selectedDanceStyleId = DANCES[0]?.id || 'waltz';
+
+  function startDanceByStyle(styleId, { sendInvite = false } = {}) {
+    const dance = DANCES.find((d) => d.id === styleId) || DANCES[0];
+    if (!dance) return false;
+    selectedDanceStyleId = dance.id;
+    const actorId = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    const started = startDance(mechState, levelState, actorId, dance.id);
+    if (started) {
+      audio.playDanceStep(0, dance.id);
+      const actor = levelState.actors[actorId];
+      if (actor) {
+        spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 14, `${dance.icon} ${dance.name}!`, '#FDE68A');
+      }
+      if (coopSession.active) {
+        coopClient.sendDanceSync({ character: actorId, styleId: dance.id, active: true });
+        if (sendInvite || (elDanceInviteChk && elDanceInviteChk.checked)) {
+          coopClient.sendDanceInvite(dance.id, dance.name);
+          spawnWorldToast(
+            (actor?.x || 200) + 17,
+            (actor?.y || 300) - 34,
+            'Dance Invite Sent!',
+            '#F9A8D4'
+          );
+        }
+      }
+    }
+    return Boolean(started);
+  }
+
+  function triggerOneTapDance() {
+    if (gameState !== 'playing' || activeSubModal) return;
+    audio.unlock();
+    const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    if (mechState.dances[myChar]) {
+      stopDance(mechState, levelState, myChar);
+      if (coopSession.active) {
+        coopClient.sendDanceSync({ character: myChar, styleId: selectedDanceStyleId, active: false });
+      }
+      return;
+    }
+    startDanceByStyle(selectedDanceStyleId, { sendInvite: coopSession.active });
+    toggleDancePopover(false);
+  }
+
   function renderDanceMenu() {
     if (!elDanceGrid) return;
     elDanceGrid.innerHTML = '';
     const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
-    const activeStyle = mechState.dances[myChar]?.style || null;
+    const activeStyle = mechState.dances[myChar]?.style || selectedDanceStyleId;
 
     DANCES.forEach((dance) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = `dance-item-btn${activeStyle === dance.id ? ' active' : ''}`;
+      btn.className = `dance-choice-btn${activeStyle === dance.id ? ' active' : ''}`;
       btn.dataset.danceStyle = dance.id;
       btn.innerHTML = `<span class="dance-item-icon" aria-hidden="true">${dance.icon}</span><span>${dance.name}</span>`;
       btn.addEventListener('click', (e) => {
         e.currentTarget.blur();
         audio.unlock();
-        const actorId = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
-        const started = startDance(mechState, levelState, actorId, dance.id);
-        if (started) {
-          audio.playDanceStep(0, dance.id);
-          const actor = levelState.actors[actorId];
-          if (actor) {
-            spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 14, `${dance.icon} ${dance.name}!`, '#FDE68A');
-          }
-          if (coopSession.active) {
-            coopClient.sendDanceSync({ character: actorId, styleId: dance.id, active: true });
-            if (elDanceInviteChk && elDanceInviteChk.checked) {
-              coopClient.sendDanceInvite(dance.id, dance.name);
-              spawnWorldToast(
-                (actor?.x || 200) + 17,
-                (actor?.y || 300) - 34,
-                'Dance Invite Sent!',
-                '#F9A8D4'
-              );
-            }
-          }
-        }
+        startDanceByStyle(dance.id, { sendInvite: Boolean(elDanceInviteChk && elDanceInviteChk.checked) });
         toggleDancePopover(false);
       });
       elDanceGrid.appendChild(btn);
@@ -2445,11 +4309,11 @@ function bootstrapBrowserGame() {
   }
 
   function toggleDancePopover(forceOpen = null) {
-    if (!elDancePopover || !elHudBtnDance) return;
+    if (!elDancePopover) return;
     const currentlyOpen = !elDancePopover.classList.contains('hidden');
     const nextOpen = forceOpen === null ? !currentlyOpen : Boolean(forceOpen);
     elDancePopover.classList.toggle('hidden', !nextOpen);
-    elHudBtnDance.setAttribute('aria-expanded', String(nextOpen));
+    document.getElementById('hud-btn-dance-styles')?.setAttribute('aria-expanded', String(nextOpen));
     if (nextOpen) {
       renderDanceMenu();
     }
@@ -2485,10 +4349,11 @@ function bootstrapBrowserGame() {
   }
 
   function handleCarryOrRescue() {
-    if (gameState !== 'playing' || activeSubModal) return;
+    if (gameState !== 'playing' || activeSubModal || levelState.gameOver) return;
     const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    const myActor = levelState.actors[myChar];
 
-    // 1. Check cooperative Edge Rescue first if partner is slipping/falling nearby
+    // 1. Cooperative Edge Rescue if partner is falling nearby
     if (mechState.soulLink.rescueCandidate && mechState.soulLink.rescueCandidate.rescuerId === myChar) {
       const rescueRes = triggerEdgeRescue(mechState, levelState, myChar);
       if (rescueRes.ok) {
@@ -2518,7 +4383,74 @@ function bootstrapBrowserGame() {
       }
     }
 
-    // 2. Otherwise pickup or gently toss carried partner
+    // 2. In-world Canvas2D Puzzle Node interaction (rotating pillars, levers, conduits)
+    if (myActor && !myActor.carryingBlockId && !(mechState.carrying && mechState.carrying.carrierId === myChar)) {
+      const puzRes = interactWithNearbyPuzzle(levelState, myActor, { allowHand: false }, simCallbacks);
+      if (puzRes.ok) {
+        audio.playSwitchPress();
+        if (coopSession.active && puzRes.puzzle) {
+          coopClient.sendPuzzleSync({
+            puzzleId: puzRes.puzzle.id,
+            solved: puzRes.puzzle.solved,
+            nodes: puzRes.puzzle.nodes.map((n) => ({
+              id: n.id,
+              glyphIndex: n.glyphIndex,
+              activated: n.activated,
+            })),
+            enteredOrder: puzRes.puzzle.enteredOrder,
+          });
+        }
+        broadcastStorySnapshot('puzzle');
+        return;
+      }
+      if (puzRes.reason === 'NEEDS_TOOL' && myActor) {
+        audio.playSwitchRelease();
+        spawnWorldToast(myActor.x + myActor.w * 0.5, myActor.y - 18, 'Need Energy Wand or Key!', '#FCA5A5');
+        return;
+      }
+      if (puzRes.reason === 'WRONG_ORDER' && myActor) {
+        audio.playSwitchRelease();
+        spawnWorldToast(myActor.x + myActor.w * 0.5, myActor.y - 18, 'Wrong Order — Reset!', '#FCA5A5');
+        return;
+      }
+    }
+
+    // 3. Heavy Carry Block pickup / drop (strict mutex with partner carry)
+    if (myActor && !(mechState.carrying && mechState.carrying.carrierId === myChar)) {
+      const blockRes = tryCarryBlockInteraction(levelState, mechState, myChar, simCallbacks);
+      if (blockRes.ok && blockRes.block) {
+        if (blockRes.action === 'pickup') {
+          audio.playCarryPickup();
+          spawnWorldToast(myActor.x + myActor.w * 0.5, myActor.y - 24, `Carrying ${blockRes.block.label || 'Relic'}!`, '#FDE68A');
+        } else {
+          audio.playCarryDrop();
+        }
+        if (coopSession.active) {
+          coopClient.sendCarrySync({
+            kind: blockRes.action === 'pickup' ? 'block_pickup' : 'block_drop',
+            carrierId: myChar,
+            blockId: blockRes.block.id,
+            x: Math.round(blockRes.block.x),
+            y: Math.round(blockRes.block.y),
+            placedPedestalId: blockRes.block.placedPedestalId || null,
+          });
+        }
+        broadcastStorySnapshot('blocks');
+        return;
+      }
+      if (blockRes.reason === 'WALL_BLOCKED') {
+        audio.playSwitchRelease();
+        spawnWorldToast(myActor.x + myActor.w * 0.5, myActor.y - 20, 'Room needed to drop block!', '#FCA5A5');
+        return;
+      }
+    }
+
+    // 4. Otherwise pickup or gently toss carried partner
+    if (myActor && myActor.carryingBlockId) {
+      spawnWorldToast(myActor.x + myActor.w * 0.5, myActor.y - 20, 'Drop Relic First!', '#FDE68A');
+      return;
+    }
+
     const res = toggleCarry(mechState, levelState, myChar);
     const actor = levelState.actors[myChar];
     if (res.ok) {
@@ -2607,11 +4539,93 @@ function bootstrapBrowserGame() {
     }
   }
 
+  function handleWeaponCycle() {
+    if (gameState !== 'playing' || activeSubModal) return;
+    const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    const actor = levelState.actors[myChar];
+    if (!actor || !actor.weapons || actor.weapons.length < 2) return;
+    const nextId = cycleActorWeapon(actor);
+    if (!nextId) return;
+    const def = getWeaponDef(nextId);
+    audio.playUiClick();
+    spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 16, def.name, def.secondary);
+    syncHudStatic();
+    lastCoopStateSendMs = 0;
+  }
+
+  function handleWeaponUse() {
+    if (gameState !== 'playing' || activeSubModal || levelState.gameOver) return;
+    const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    const actor = levelState.actors[myChar];
+    if (!actor) return;
+
+    const res = triggerWeaponAction(levelState, actor, simCallbacks);
+
+    if (res.hits.some((h) => h.kind === 'switch')) {
+      audio.playSwitchPress();
+      broadcastStorySnapshot('switch');
+    } else if (res.pickedUp || res.hits.some((h) => h.kind === 'barrier' || h.kind === 'monster')) {
+      broadcastStorySnapshot('weapon');
+    }
+
+    syncHudStatic();
+    lastCoopStateSendMs = 0;
+  }
+
+  function triggerLocalDash() {
+    if (gameState !== 'playing' || activeSubModal || levelState.gameOver) return;
+    const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    const actor = levelState.actors[myChar];
+    if (!actor) return;
+
+    const dirX =
+      keysHeld.has('ArrowLeft') || keysHeld.has('KeyA') || touchHeld.left
+        ? -1
+        : keysHeld.has('ArrowRight') || keysHeld.has('KeyD') || touchHeld.right
+          ? 1
+          : actor.facing || 1;
+    const res = triggerManualSoulDash(levelState, actor, dirX);
+    if (res.ok) {
+      audio.playJump(myChar);
+      particles.burst(actor.x + actor.w * 0.5, actor.y + actor.h * 0.5, 12, {
+        colors: ['#BAE6FD', '#7DD3FC', '#FDE68A'],
+        minSpeed: 40,
+        maxSpeed: 130,
+        size: 4,
+        shape: 'spark',
+        gravity: 20,
+      });
+      spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 14, 'Soul Dash!', '#BAE6FD');
+      lastCoopStateSendMs = 0;
+    } else if (res.reason === 'COOLDOWN') {
+      const rem = Math.max(0.1, actor.dashCooldown || 0);
+      spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 14, `Dash ${rem.toFixed(1)}s`, '#94A3B8');
+    }
+    updateDashCooldownHud();
+  }
+
+  function getActiveSector(state) {
+    if (!state || !Array.isArray(state.sectors) || state.sectors.length === 0) return null;
+    const m = state.actors?.madjid;
+    const n = state.actors?.nadine;
+    const trackedX = coopSession.active && coopSession.localCharId
+      ? state.actors?.[coopSession.localCharId]?.x ?? 0
+      : Math.max(m?.x ?? 0, n?.x ?? 0);
+    let active = state.sectors[0];
+    for (let i = 0; i < state.sectors.length; i++) {
+      if (trackedX >= state.sectors[i].startX) {
+        active = state.sectors[i];
+      }
+    }
+    return active;
+  }
+
   function syncHudStatic() {
     applyCoopUiLock();
     const activeSkin = getSkin(activeCharId, selectedSkins[activeCharId]);
 
     if (playMode === 'openworld') {
+      lastSectorCode = 'OW';
       elHudChapterNum.textContent = 'Open World';
       elHudChapterTitle.textContent = 'Cozy Open-World Meadow';
       elPauseChapterInfo.textContent = '2D Open-World Sandbox · Build & Craft Together';
@@ -2621,8 +4635,12 @@ function bootstrapBrowserGame() {
       document.body.dataset.keys = 'openworld';
     } else {
       const level = LEVELS[currentLevelIdx];
-      elHudChapterNum.textContent = level.shortCode || `W${level.worldId}-${level.stageInWorld}`;
-      elHudChapterTitle.textContent = level.title;
+      const sector = getActiveSector(levelState);
+      lastSectorCode = sector ? sector.code : '';
+      elHudChapterNum.textContent = sector
+        ? `W${level.worldId} · ${sector.code}`
+        : level.shortCode || `W${level.worldId}-${level.stageInWorld}`;
+      elHudChapterTitle.textContent = sector ? sector.name : level.title;
       elHudKeyCount.textContent = `${levelState.keysCollected}/${levelState.keysRequired}`;
       elPauseChapterInfo.textContent = `${level.worldName} · ${level.shortCode} · ${level.title}`;
       if (elHudKeyReadout) elHudKeyReadout.classList.remove('hidden');
@@ -2641,7 +4659,56 @@ function bootstrapBrowserGame() {
       elHudCheckpoint.setAttribute('aria-label', hasCp ? 'Checkpoint active' : 'No checkpoint lit yet');
     }
 
+    const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+    const myActor = levelState.actors[myChar];
+    const eqId = myActor?.equippedWeapon || null;
+    const eqCount = myActor?.weapons?.length || 0;
+    const nearbyWeapon = Boolean(
+      myActor &&
+        (levelState.weaponPickups || []).some(
+          (p) => !p.collected && Math.hypot(myActor.x + myActor.w * 0.5 - p.x, myActor.y + myActor.h * 0.5 - p.y) <= 52
+        )
+    );
+    if (elHudBtnWeapon && elHudWeaponLabel) {
+      elHudWeaponLabel.textContent = eqId ? getWeaponDef(eqId).shortName : nearbyWeapon ? 'Grab' : 'Hands';
+      elHudBtnWeapon.classList.toggle('is-ready', Boolean(eqId || nearbyWeapon));
+    }
+    if (elHudBtnWeaponNext) {
+      elHudBtnWeaponNext.classList.toggle('hidden', eqCount < 2);
+    }
+    if (elTouchWeapon) {
+      const span = elTouchWeapon.querySelector('span');
+      if (span) span.textContent = eqId ? getWeaponDef(eqId).shortName : nearbyWeapon ? 'Grab' : 'Use';
+      elTouchWeapon.classList.toggle('is-ready', Boolean(eqId || nearbyWeapon));
+    }
+    if (elTouchWeaponCycle) {
+      elTouchWeaponCycle.classList.toggle('hidden', eqCount < 2);
+    }
+
+    const isSpaceSwim = levelState.physicsMode === 'space_swim';
+    const isSwimMode = levelState.physicsMode === 'underwater' || isSpaceSwim;
+    const onOrNearLadder = Boolean(myActor && (myActor.onLadder || findOverlappingLadder(levelState, myActor)));
+    elTouchDown?.classList.toggle('hidden', !(isSwimMode || onOrNearLadder));
+    if (elTouchDown) {
+      const dSpan = elTouchDown.querySelector('span');
+      if (dSpan) dSpan.textContent = onOrNearLadder && !isSwimMode ? 'Climb' : 'Dive';
+    }
+    if (elTouchJump) {
+      const jSpan = elTouchJump.querySelector('span');
+      if (jSpan) {
+        jSpan.textContent = isSpaceSwim
+          ? 'Float'
+          : levelState.physicsMode === 'underwater'
+            ? 'Swim'
+            : onOrNearLadder
+              ? 'Climb'
+              : 'Jump';
+      }
+    }
+
     document.body.dataset.activeCharacter = activeCharId;
+    syncHealthHud();
+    updateDashCooldownHud();
     renderOpenWorldToolbar();
   }
 
@@ -2654,13 +4721,209 @@ function bootstrapBrowserGame() {
     }, durationMs);
   }
 
+  function clearDedicationTimer() {
+    if (dedicationAutoTimer) {
+      window.clearTimeout(dedicationAutoTimer);
+      dedicationAutoTimer = null;
+    }
+  }
+
+  function persistSoloCheckpointSnapshot(labelOverride = null) {
+    if (playMode !== 'story' || coopSession.active || !levelState || levelState.completed || isApplyingRemoteUpdate) {
+      return;
+    }
+    const level = LEVELS[currentLevelIdx];
+    const world = level ? getWorldById(level.worldId) : null;
+    const sector = getActiveSector(levelState);
+    const litCount = (levelState.checkpoints || []).filter((c) => c.activated).length;
+    const label =
+      labelOverride ||
+      (levelState.activeCheckpoint
+        ? litCount > 0
+          ? `Checkpoint ${litCount}`
+          : 'Checkpoint'
+        : 'Start of World');
+    const snap = captureCheckpointSnapshot(levelState, {
+      bossState,
+      levelIndex: currentLevelIdx,
+      worldName: level?.worldName || world?.name || '',
+      stageTitle: level?.title || '',
+      sectorCode: sector?.code || '',
+      sectorName: sector?.name || '',
+      checkpointNumber: litCount,
+      checkpointLabel: label,
+    });
+    levelState.checkpointSnapshot = snap;
+    saveSoloCheckpointSnapshot(window.localStorage, snap);
+  }
+
+  function persistCurrentCoopRoom(room) {
+    if (!room || !room.code) return;
+    const idx = typeof room.levelIndex === 'number' ? room.levelIndex : currentLevelIdx;
+    const lvl = LEVELS[Math.max(0, Math.min(LEVELS.length - 1, idx))];
+    saveLastCoopRoom(window.localStorage, {
+      code: room.code,
+      name: room.name || '',
+      mode: room.mode === 'openworld' ? 'openworld' : 'story',
+      levelIndex: idx,
+      worldId: lvl?.worldId || 1,
+      worldName: lvl?.worldName || 'Co-op Journey',
+    });
+  }
+
+  function getSavedResumeDescriptor() {
+    const solo = loadSoloCheckpointSnapshot(window.localStorage);
+    const coop = loadLastCoopRoom(window.localStorage);
+    let primary = null;
+    if (solo && coop) {
+      primary = (solo.savedAt || 0) >= (coop.savedAt || 0) ? 'solo' : 'coop';
+    } else if (solo) {
+      primary = 'solo';
+    } else if (coop) {
+      primary = 'coop';
+    }
+    return { solo, coop, primary };
+  }
+
+  function renderLobbyResumePrompt() {
+    if (!elLobbyResumePrompt) return;
+    const desc = getSavedResumeDescriptor();
+    if (resumePromptDismissed || !desc.primary) {
+      elLobbyResumePrompt.classList.add('hidden');
+      return;
+    }
+
+    elLobbyResumePrompt.classList.remove('hidden');
+    if (desc.primary === 'solo' && desc.solo) {
+      const s = desc.solo;
+      if (elLobbyResumeKicker) elLobbyResumeKicker.textContent = 'Saved Solo Progress Ready';
+      if (elLobbyResumeSummary) {
+        const worldText = `World ${s.worldId}${s.worldName ? `: ${s.worldName}` : ''}`;
+        const cpText = s.checkpointLabel || 'Start of World';
+        const keyText = s.keysRequired ? ` · Keys ${s.keysCollected || 0}/${s.keysRequired}` : '';
+        elLobbyResumeSummary.textContent = `${worldText} · ${cpText}${keyText}`;
+      }
+      if (elBtnResumeSaved) {
+        elBtnResumeSaved.textContent = `Continue W${s.worldId} (${s.checkpointLabel || 'Saved'})`;
+        elBtnResumeSaved.dataset.resumeKind = 'solo';
+      }
+      if (elBtnResumeAlt) {
+        if (desc.coop) {
+          elBtnResumeAlt.classList.remove('hidden');
+          elBtnResumeAlt.textContent = `Resume Co-op (${desc.coop.code})`;
+          elBtnResumeAlt.dataset.resumeKind = 'coop';
+        } else {
+          elBtnResumeAlt.classList.add('hidden');
+        }
+      }
+    } else if (desc.coop) {
+      const c = desc.coop;
+      if (elLobbyResumeKicker) elLobbyResumeKicker.textContent = 'Last Online Co-op Room Ready';
+      if (elLobbyResumeSummary) {
+        const roomTitle = c.name ? ` ("${c.name}")` : '';
+        const modeText = c.mode === 'openworld' ? 'Open World' : `World ${c.worldId}`;
+        elLobbyResumeSummary.textContent = `Room ${c.code}${roomTitle} · ${modeText}`;
+      }
+      if (elBtnResumeSaved) {
+        elBtnResumeSaved.textContent = `Rejoin Room ${c.code}`;
+        elBtnResumeSaved.dataset.resumeKind = 'coop';
+      }
+      if (elBtnResumeAlt) {
+        if (desc.solo) {
+          elBtnResumeAlt.classList.remove('hidden');
+          elBtnResumeAlt.textContent = `Continue Solo W${desc.solo.worldId}`;
+          elBtnResumeAlt.dataset.resumeKind = 'solo';
+        } else {
+          elBtnResumeAlt.classList.add('hidden');
+        }
+      }
+    }
+  }
+
+  function resumeSavedSoloSnapshot(snap) {
+    if (!snap || typeof snap.levelIndex !== 'number') return false;
+    resumePromptDismissed = false;
+    closeAllSubModals();
+    elVictoryModal.classList.add('hidden');
+    elChapterClearModal.classList.add('hidden');
+    if (coopSession.active) {
+      coopClient.leaveRoom();
+    }
+    const targetIdx = Math.max(0, Math.min(LEVELS.length - 1, snap.levelIndex));
+    loadChapter(targetIdx, { instantBg: false, showStory: true });
+    restoreCheckpointSnapshot(levelState, snap, { bossState });
+    ['madjid', 'nadine'].forEach((cid) => {
+      const actor = levelState.actors[cid];
+      if (!actor) return;
+      initActorHealth(actor);
+      const pos = levelState.activeCheckpoint?.[cid] || levelState.spawns?.[cid];
+      if (pos) {
+        actor.x = pos.x;
+        actor.y = pos.y;
+      }
+      actor.vx = 0;
+      actor.vy = 0;
+      actor.hp = actor.maxHp;
+      actor.hurtTimer = 0;
+      actor.invulnTimer = 0.8;
+      actor.mood = 'normal';
+    });
+    const sector = getActiveSector(levelState);
+    levelState.checkpointSnapshot = captureCheckpointSnapshot(levelState, {
+      bossState,
+      levelIndex: currentLevelIdx,
+      worldName: LEVELS[currentLevelIdx]?.worldName || '',
+      stageTitle: LEVELS[currentLevelIdx]?.title || '',
+      sectorCode: sector?.code || '',
+      sectorName: sector?.name || '',
+      checkpointLabel: snap.checkpointLabel || 'Saved Checkpoint',
+      checkpointNumber: snap.checkpointNumber ?? 0,
+    });
+    hasInitializedCam = false;
+    syncHudStatic();
+    syncBossBarHud();
+    syncHealthHud();
+    setGameState('playing');
+    const lead = levelState.actors.madjid;
+    if (lead) {
+      spawnWorldToast(lead.x + 20, lead.y - 24, `Resumed ${snap.checkpointLabel || 'Saved Stage'}!`, '#FDE68A');
+    }
+    return true;
+  }
+
+  function resumeSavedCoopRoom(coopInfo) {
+    if (!coopInfo || !coopInfo.code) return false;
+    resumePromptDismissed = false;
+    pendingResumeRoomCode = coopInfo.code;
+    if (coopClient.getStatus() === 'connected') {
+      const code = pendingResumeRoomCode;
+      pendingResumeRoomCode = null;
+      coopClient.joinRoom(code, { skinId: selectedSkins.madjid });
+    } else {
+      coopClient.connect(elCoopServerUrl?.value || getDefaultWsUrl());
+    }
+    return true;
+  }
+
   function setGameState(nextState) {
     gameState = nextState;
     document.body.dataset.state = nextState;
+    if (nextState !== 'dedication') {
+      clearDedicationTimer();
+    }
 
+    elDedicationScreen?.classList.toggle('hidden', nextState !== 'dedication');
     elTitleScreen.classList.toggle('hidden', nextState !== 'title');
-    elHudLayer.classList.toggle('hidden', nextState === 'title');
+    elHudLayer.classList.toggle('hidden', nextState === 'title' || nextState === 'dedication');
     elPauseModal.classList.toggle('hidden', nextState !== 'paused');
+    audio.setPaused(nextState === 'paused');
+
+    if (nextState === 'title') {
+      renderLobbyWorldMap();
+      renderLobbyResumePrompt();
+      syncMuteUI();
+    }
+    syncStoryWhisperHud();
 
     if (nextState === 'playing') {
       clearInputs();
@@ -2671,6 +4934,7 @@ function bootstrapBrowserGame() {
   }
 
   function loadOpenWorld({ instantBg = false, showStory = true, syncedState = null } = {}) {
+    clearCoopAdvanceTimer();
     playMode = 'openworld';
     if (syncedState) {
       openWorldState = createOpenWorldState(
@@ -2690,6 +4954,7 @@ function bootstrapBrowserGame() {
 
     mechState = createMechanicsState();
     bossState = null;
+    weddingCeremony = null;
     photoSpots = getOpenWorldPhotoSpots(600);
     activePhotoSpot = null;
     lastBossBroadcastSig = '';
@@ -2705,6 +4970,8 @@ function bootstrapBrowserGame() {
     interactionState.bubbles.nadine = null;
     interactionState.beacons.length = 0;
     toggleDancePopover(false);
+    toggleSettingsDrawer(false);
+    elTryAgainModal?.classList.add('hidden');
     if (elGhostWarningBanner) elGhostWarningBanner.classList.add('hidden');
     if (elDanceInviteBanner) elDanceInviteBanner.classList.add('hidden');
     if (elHudBossBar) elHudBossBar.classList.add('hidden');
@@ -2725,6 +4992,7 @@ function bootstrapBrowserGame() {
     syncHudStatic();
     syncBossBarHud();
     elHudTimer.textContent = '00:00';
+    audio.setWorldMusicContext({ playMode: 'openworld', worldId: 0, gameState });
 
     if (showStory) {
       showCaption(owDef.caption, 8500);
@@ -2732,17 +5000,30 @@ function bootstrapBrowserGame() {
   }
 
   function loadChapter(index, { instantBg = false, showStory = true } = {}) {
+    clearCoopAdvanceTimer();
     playMode = 'story';
     currentLevelIdx = Math.max(0, Math.min(LEVELS.length - 1, index));
     const level = LEVELS[currentLevelIdx];
     const world = getWorldById(level.worldId);
     selectedWorldTab = world.id;
     levelState = createInitialLevelState(level);
+    storyState = createStorylineState(world.id);
     activeCharId = coopSession.active && coopSession.localCharId ? coopSession.localCharId : 'madjid';
     remoteActorTarget.active = false;
 
     mechState = createMechanicsState();
     bossState = createBossForLevel(level);
+    weddingCeremony = null;
+    levelState.bossDefeated = !bossState || Boolean(bossState.defeated);
+    levelState.portalUnlocked = computePortalUnlocked(levelState);
+    levelState.checkpointSnapshot = captureCheckpointSnapshot(levelState, {
+      bossState,
+      levelIndex: currentLevelIdx,
+      worldName: level.worldName,
+      stageTitle: level.title,
+      checkpointLabel: 'Start of World',
+      checkpointNumber: 0,
+    });
     photoSpots = getPhotoSpotsForLevel(level);
     activePhotoSpot = null;
     lastBossBroadcastSig = '';
@@ -2754,6 +5035,8 @@ function bootstrapBrowserGame() {
     interactionState.bubbles.nadine = null;
     interactionState.beacons.length = 0;
     toggleDancePopover(false);
+    toggleSettingsDrawer(false);
+    elTryAgainModal?.classList.add('hidden');
     if (elGhostWarningBanner) elGhostWarningBanner.classList.add('hidden');
     if (elDanceInviteBanner) elDanceInviteBanner.classList.add('hidden');
 
@@ -2769,18 +5052,25 @@ function bootstrapBrowserGame() {
     cameraLookAheadX = 0;
     hasInitializedCam = false;
     hitstopTimer = 0;
+    autoRespawnTimer = 0;
     cameraShakeTrauma = 0;
+    elHudEscapeBanner?.classList.add('hidden');
     clearInputs();
     syncHudStatic();
     syncBossBarHud();
+    syncStoryWhisperHud();
     elHudTimer.textContent = '00:00';
+    audio.setWorldMusicContext({ playMode: 'story', worldId: world.id, gameState });
 
     if (showStory) {
       showCaption(`${level.worldName} (${level.code}): ${level.caption}`, 8200);
+      fireStoryBeat('world_intro');
     }
   }
 
   function startNewGame(startChapterIdx = 0, { silent = false, fromRemote = false } = {}) {
+    clearCoopAdvanceTimer();
+    resumePromptDismissed = false;
     if (!silent) {
       audio.unlock();
       audio.playUiClick();
@@ -2794,8 +5084,11 @@ function bootstrapBrowserGame() {
     }
     loadChapter(startChapterIdx, { instantBg: silent, showStory: true });
     setGameState('playing');
+    if (!silent && !fromRemote && !coopSession.active) {
+      persistSoloCheckpointSnapshot('Start of World');
+    }
     if (coopSession.active && !fromRemote) {
-      coopClient.setRoomMode({ mode: 'story', levelIndex: currentLevelIdx });
+      coopClient.setRoomMode({ mode: 'story', levelIndex: currentLevelIdx, reset: true });
     }
   }
 
@@ -2891,9 +5184,8 @@ function bootstrapBrowserGame() {
   }
 
   function renderChaptersList() {
-    elChaptersProgressLabel.textContent = `${WORLDS.length} Worlds · ${LEVELS.length} Stages · ${clearedLevelIds.size}/${LEVELS.length} Cleared`;
+    elChaptersProgressLabel.textContent = `${WORLDS.length} Seamless Worlds · ${LEVELS.length} Guardians · ${clearedLevelIds.size}/${LEVELS.length} Cleared`;
 
-    // Render 10-World Tabs
     elWorldTabs.innerHTML = '';
     WORLDS.forEach((world) => {
       const tab = document.createElement('button');
@@ -2924,49 +5216,54 @@ function bootstrapBrowserGame() {
       elWorldTabs.appendChild(tab);
     });
 
-    // Update World Banner
     const activeWorld = getWorldById(selectedWorldTab);
+    const activeWorldUnlocked = isWorldUnlocked(progressionState, activeWorld.id);
+    const activeWorldDangerous = isWorldDangerous(activeWorld.id);
     const worldThemeLabel = TIME_PRESETS[activeWorld.theme]?.label || activeWorld.theme;
-    elWorldBannerKicker.textContent = `World ${activeWorld.id} of ${WORLDS.length}`;
+    elWorldBannerKicker.textContent = `World ${activeWorld.id} of ${WORLDS.length}${!activeWorldUnlocked ? ' · Locked' : activeWorldDangerous ? ' · Dangerous Territory' : ''}`;
     elWorldBannerName.textContent = activeWorld.name;
     elWorldBannerMeta.textContent = `${activeWorld.subtitle} · ${worldThemeLabel}`;
 
-    // Render 5 Stages for Selected World
     elChaptersList.innerHTML = '';
     const worldLevels = getLevelsForWorld(selectedWorldTab);
     worldLevels.forEach((lvl) => {
       const globalIdx = LEVELS.findIndex((item) => item.id === lvl.id);
+      const unlocked = isWorldUnlocked(progressionState, lvl.worldId);
+      const dangerous = isWorldDangerous(lvl.worldId);
       const isCurrent = globalIdx === currentLevelIdx && gameState !== 'title' && playMode === 'story';
-      const isCleared = clearedLevelIds.has(lvl.id);
+      const isCleared = clearedLevelIds.has(lvl.id) || getWorldProgressionStatus(progressionState, lvl.worldId) === 'completed';
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = `chapter-row-btn${isCurrent ? ' is-current' : ''}`;
+      btn.disabled = !unlocked;
+      btn.className = `chapter-row-btn${isCurrent ? ' is-current' : ''}${!unlocked ? ' is-locked' : ''}`;
 
       const main = document.createElement('div');
       main.className = 'chapter-row-main';
 
       const title = document.createElement('span');
       title.className = 'chapter-row-title';
-      title.textContent = `${lvl.code} · ${lvl.title}`;
+      title.textContent = `${lvl.code || `W${lvl.worldId}`} · ${lvl.title}`;
 
       const themeLabel = TIME_PRESETS[lvl.theme]?.label || lvl.theme;
       const cpCount = lvl.checkpoints?.length || 0;
+      const puzCount = lvl.puzzles?.length || 0;
       const meta = document.createElement('span');
-      meta.className = 'chapter-row-meta';
-      meta.textContent = `${themeLabel} · ${lvl.exit.keysRequired} Key${lvl.exit.keysRequired > 1 ? 's' : ''}${cpCount > 0 ? ` · ${cpCount} Lantern${cpCount > 1 ? 's' : ''}` : ''}`;
+      meta.className = `chapter-row-meta${dangerous ? ' is-danger' : ''}`;
+      meta.textContent = `${themeLabel} · ${lvl.exit.keysRequired} Key${lvl.exit.keysRequired > 1 ? 's' : ''}${lvl.boss ? ` · Boss: ${lvl.boss.name}` : ''}${puzCount ? ` · ${puzCount} Puzzle${puzCount > 1 ? 's' : ''}` : ''}${cpCount > 0 ? ` · ${cpCount} Lanterns` : ''}${dangerous ? ' · Dangerous Territory' : ''}`;
 
       main.appendChild(title);
       main.appendChild(meta);
 
       const status = document.createElement('span');
       status.className = `chapter-row-status${isCleared ? ' cleared' : ''}`;
-      status.textContent = isCurrent ? 'Current' : isCleared ? 'Cleared' : 'Play';
+      status.textContent = !unlocked ? 'Locked' : isCurrent ? 'Current' : isCleared ? 'Cleared' : 'Play';
 
       btn.appendChild(main);
       btn.appendChild(status);
 
       btn.addEventListener('click', () => {
+        if (!unlocked) return;
         if (globalIdx >= 0) {
           startNewGame(globalIdx);
         }
@@ -3007,6 +5304,12 @@ function bootstrapBrowserGame() {
 
   function renderCoopRoomsList(rooms) {
     coopDirectoryRooms = Array.isArray(rooms) ? rooms : [];
+    const openRoom = findFirstOpenRoom(coopDirectoryRooms);
+    if (elBtnCoopQuickJoin) {
+      elBtnCoopQuickJoin.title = openRoom
+        ? `Quick Join "${openRoom.name}" (${openRoom.code})`
+        : 'Search and join the first available open room';
+    }
     renderCoopRoomsListComponent(elCoopRoomsList, coopDirectoryRooms, {
       isConnected: coopClient.isConnected(),
       onJoinRoom(room) {
@@ -3118,84 +5421,318 @@ function bootstrapBrowserGame() {
     });
   }
 
-  function broadcastStorySnapshot(eventName) {
+  function broadcastStorySnapshot(eventName = 'update', { replace = false } = {}) {
     if (!coopSession.active || playMode !== 'story' || isApplyingRemoteUpdate) return;
+    const switchesMap = {};
+    levelState.switches.forEach((s) => {
+      switchesMap[s.id] = { toggled: Boolean(s.toggled), pressed: Boolean(s.pressed) };
+    });
+    const gatesMap = {};
+    levelState.gates.forEach((g) => {
+      gatesMap[g.id] = Boolean(g.latchedOpen);
+    });
+    const placedBlocksMap = {};
+    (levelState.carryBlocks || []).forEach((b) => {
+      placedBlocksMap[b.id] = {
+        x: Math.round(b.x),
+        y: Math.round(b.y),
+        placedPedestalId: b.placedPedestalId || null,
+      };
+    });
+    const puzzleProgressMap = {};
+    (levelState.puzzles || []).forEach((p) => {
+      puzzleProgressMap[p.id] = {
+        solved: Boolean(p.solved),
+        enteredOrder: Array.isArray(p.enteredOrder) ? p.enteredOrder.slice() : [],
+        nodes: (p.nodes || []).map((n) => ({
+          id: n.id,
+          glyphIndex: n.glyphIndex,
+          activated: Boolean(n.activated),
+        })),
+      };
+    });
+    const defeatedBosses = bossState?.defeated ? [bossState.id || `boss_w${LEVELS[currentLevelIdx]?.worldId || 1}`] : [];
+    const defeatedMonsters = (levelState.monsters || [])
+      .filter((m) => m.defeated || m.koTimer > 0)
+      .map((m) => m.id);
+
     coopClient.sendStorySync({
       event: eventName,
+      replace: Boolean(replace),
       levelIndex: currentLevelIdx,
-      switches: levelState.switches.map((s) => ({ id: s.id, toggled: s.toggled, pressed: s.pressed })),
-      keys: levelState.keys.map((k) => ({ id: k.id, collected: k.collected })),
-      gates: levelState.gates.map((g) => ({ id: g.id, latchedOpen: g.latchedOpen })),
+      switches: switchesMap,
+      gates: gatesMap,
+      collectedKeys: levelState.keys.filter((k) => k.collected).map((k) => k.id),
+      collectedWeapons: (levelState.weaponPickups || []).filter((w) => w.collected).map((w) => w.id),
+      brokenBarriers: (levelState.fragileBarriers || []).filter((b) => b.broken).map((b) => b.id),
+      defeatedBosses,
+      defeatedMonsters,
+      placedBlocks: placedBlocksMap,
+      puzzleProgress: puzzleProgressMap,
+      activatedCheckpoints: levelState.checkpoints.filter((c) => c.activated).map((c) => c.id),
       activeCheckpointId: levelState.activeCheckpoint ? levelState.activeCheckpoint.id : null,
       completed: levelState.completed,
     });
+  }
+
+  function restoreStoryProgress(sp, { isLiveEvent = false } = {}) {
+    if (!sp || playMode !== 'story') return;
+
+    // Switches (supports both object map from server persistence & legacy array)
+    if (Array.isArray(sp.switches)) {
+      sp.switches.forEach((rs) => {
+        const sw = levelState.switches.find((s) => s.id === rs.id);
+        if (sw && sw.mode === 'toggle') {
+          sw.toggled = Boolean(rs.toggled);
+          sw.pressed = Boolean(rs.pressed ?? rs.toggled);
+        }
+      });
+    } else if (sp.switches && typeof sp.switches === 'object') {
+      Object.entries(sp.switches).forEach(([swId, rs]) => {
+        const sw = levelState.switches.find((s) => s.id === swId);
+        if (sw && sw.mode === 'toggle' && rs && typeof rs === 'object') {
+          sw.toggled = Boolean(rs.toggled);
+          sw.pressed = Boolean(rs.pressed ?? rs.toggled);
+        }
+      });
+    }
+
+    // Gates
+    if (Array.isArray(sp.gates)) {
+      sp.gates.forEach((rg) => {
+        const g = levelState.gates.find((item) => item.id === rg.id);
+        if (g && rg.latchedOpen) {
+          g.latchedOpen = true;
+          if (!isLiveEvent) g.openProgress = 1;
+        }
+      });
+    } else if (sp.gates && typeof sp.gates === 'object') {
+      Object.entries(sp.gates).forEach(([gateId, latched]) => {
+        const g = levelState.gates.find((item) => item.id === gateId);
+        if (g && latched) {
+          g.latchedOpen = true;
+          if (!isLiveEvent) g.openProgress = 1;
+        }
+      });
+    }
+
+    // Keys
+    const collectedKeyIds = Array.isArray(sp.collectedKeys)
+      ? sp.collectedKeys
+      : Array.isArray(sp.keys)
+        ? sp.keys.filter((k) => k.collected).map((k) => k.id)
+        : [];
+    if (collectedKeyIds.length > 0) {
+      let pickedAny = false;
+      collectedKeyIds.forEach((kid) => {
+        const key = levelState.keys.find((item) => item.id === kid);
+        if (key && !key.collected) {
+          key.collected = true;
+          levelState.keysCollected += 1;
+          pickedAny = true;
+        }
+      });
+      if (pickedAny && isLiveEvent) audio.playKeyPickup();
+    }
+
+    // Weapons collected
+    if (Array.isArray(sp.collectedWeapons)) {
+      sp.collectedWeapons.forEach((wid) => {
+        const wp = (levelState.weaponPickups || []).find((w) => w.id === wid);
+        if (wp) wp.collected = true;
+      });
+    }
+
+    // Fragile barriers shattered
+    if (Array.isArray(sp.brokenBarriers)) {
+      sp.brokenBarriers.forEach((bid) => {
+        const fb = (levelState.fragileBarriers || []).find((b) => b.id === bid);
+        if (fb) {
+          fb.broken = true;
+          fb.hp = 0;
+        }
+      });
+    }
+
+    // Placed Relic Blocks & Pedestals
+    if (sp.placedBlocks && typeof sp.placedBlocks === 'object') {
+      Object.entries(sp.placedBlocks).forEach(([bid, entry]) => {
+        const block = (levelState.carryBlocks || []).find((b) => b.id === bid);
+        if (block && entry && typeof entry === 'object') {
+          if (typeof entry.x === 'number') block.x = entry.x;
+          if (typeof entry.y === 'number') block.y = entry.y;
+          block.placedPedestalId = entry.placedPedestalId || null;
+          block.carriedBy = null;
+          if (block.placedPedestalId) {
+            const ped = (levelState.carryPedestals || []).find((p) => p.id === block.placedPedestalId);
+            if (ped) {
+              ped.activated = true;
+              ped.occupantBlockId = block.id;
+            }
+          }
+        }
+      });
+    }
+
+    // In-World Canvas2D Puzzles
+    if (sp.puzzleProgress && typeof sp.puzzleProgress === 'object') {
+      Object.entries(sp.puzzleProgress).forEach(([pid, pState]) => {
+        const pz = (levelState.puzzles || []).find((p) => p.id === pid);
+        if (!pz || !pState || typeof pState !== 'object') return;
+        pz.solved = Boolean(pState.solved);
+        if (Array.isArray(pState.enteredOrder)) pz.enteredOrder = pState.enteredOrder.slice();
+        if (Array.isArray(pState.nodes)) {
+          pState.nodes.forEach((rn) => {
+            const node = (pz.nodes || []).find((n) => n.id === rn.id);
+            if (node) {
+              if (typeof rn.glyphIndex === 'number') node.glyphIndex = rn.glyphIndex;
+              node.activated = Boolean(rn.activated);
+            }
+          });
+        }
+        if (pz.solved) {
+          unlockPuzzleTarget(levelState, pz);
+          if (!isLiveEvent && pz.targetGateId) {
+            const g = levelState.gates.find((item) => item.id === pz.targetGateId);
+            if (g) g.openProgress = 1;
+          }
+        }
+      });
+    }
+
+    // Secondary Monsters defeated
+    if (Array.isArray(sp.defeatedMonsters) && sp.defeatedMonsters.length > 0) {
+      const deadSet = new Set(sp.defeatedMonsters);
+      (levelState.monsters || []).forEach((m) => {
+        if (deadSet.has(m.id)) {
+          m.defeated = true;
+          m.koTimer = 0;
+          m.hp = 0;
+        }
+      });
+    }
+
+    // Defeated Bosses
+    if (Array.isArray(sp.defeatedBosses) && bossState) {
+      const bossKey = bossState.id || `boss_w${LEVELS[currentLevelIdx]?.worldId || 1}`;
+      if (sp.defeatedBosses.includes(bossKey)) {
+        bossState.defeated = true;
+        bossState.active = false;
+        bossState.hp = 0;
+        levelState.bossDefeated = true;
+      }
+    }
+
+    const wasUnlocked = levelState.portalUnlocked;
+    levelState.portalUnlocked = computePortalUnlocked(levelState);
+    if (!wasUnlocked && levelState.portalUnlocked && isLiveEvent) {
+      audio.playDoorUnlock();
+    }
+
+    // Active checkpoint lantern & optional local partner warp on live checkpoint activation
+    if (sp.activeCheckpointId) {
+      const cp = levelState.checkpoints.find((c) => c.id === sp.activeCheckpointId);
+      if (cp) {
+        const wasLit = cp.activated;
+        cp.activated = true;
+        cp.pulse = 1;
+        const respawnPayload = {
+          id: cp.id,
+          x: cp.x,
+          y: cp.y,
+          madjid: {
+            x: clamp(cp.x - 28, 8, levelState.worldWidth - PHYSICS.CHAR_W - 8),
+            y: cp.y - PHYSICS.CHAR_H,
+          },
+          nadine: {
+            x: clamp(cp.x + 8, 8, levelState.worldWidth - PHYSICS.CHAR_W - 8),
+            y: cp.y - PHYSICS.CHAR_H,
+          },
+        };
+        levelState.activeCheckpoint = respawnPayload;
+        if (!wasLit && isLiveEvent) {
+          audio.playCheckpoint();
+          const myChar = coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId;
+          const localActor = levelState.actors[myChar];
+          if (localActor && !localActor.phaseDash?.active && localActor.hurtTimer <= 0 && !localActor.devouredByGhost) {
+            const distToCp = Math.hypot(localActor.x - cp.x, localActor.y - cp.y);
+            if (distToCp > 260) {
+              startPhaseDash(localActor, respawnPayload[myChar].x, respawnPayload[myChar].y, 'checkpoint', levelState.worldWidth);
+              spawnWorldToast(localActor.x + localActor.w * 0.5, localActor.y - 16, 'Warping to Checkpoint!', '#BAE6FD');
+            }
+          }
+        }
+      }
+    }
+
+    if (!isLiveEvent || sp.event === 'checkpoint') {
+      levelState.checkpointSnapshot = captureCheckpointSnapshot(levelState, {
+        bossState,
+        levelIndex: currentLevelIdx,
+        worldName: LEVELS[currentLevelIdx]?.worldName || '',
+        stageTitle: LEVELS[currentLevelIdx]?.title || '',
+      });
+    }
+    syncBossBarHud();
+    syncHudStatic();
+  }
+
+  function restoreSavedPlayerStates(room) {
+    if (!room || !room.playerStates) return;
+    if (room.customSkins && typeof room.customSkins === 'object') {
+      Object.values(room.customSkins).forEach((skin) => {
+        if (skin && skin.id) registerSkin(skin);
+      });
+    }
+    ['madjid', 'nadine'].forEach((cid) => {
+      const ps = room.playerStates[cid];
+      const actor = levelState.actors[cid];
+      if (!ps || !actor) return;
+      if (typeof ps.x === 'number' && Number.isFinite(ps.x) && typeof ps.y === 'number' && Number.isFinite(ps.y)) {
+        actor.x = clamp(ps.x, 4, Math.max(8, levelState.worldWidth - actor.w - 4));
+        actor.y = clamp(ps.y, 8, Math.max(8, levelState.worldHeight - actor.h - 4));
+        actor.vx = 0;
+        actor.vy = 0;
+      }
+      if (ps.facing === -1 || ps.facing === 1) {
+        actor.facing = ps.facing;
+      }
+      if (typeof ps.hp === 'number') {
+        actor.hp = Math.max(0, Math.min(actor.maxHp || 100, Math.round(ps.hp)));
+      }
+      if (Array.isArray(ps.weapons)) {
+        ps.weapons.forEach((wid) => giveActorWeapon(actor, wid, false));
+        if (ps.equippedWeapon && actor.weapons.includes(ps.equippedWeapon)) {
+          actor.equippedWeapon = ps.equippedWeapon;
+        }
+      }
+    });
+    syncHudStatic();
   }
 
   function applyRemoteStorySync(payload) {
     if (!payload || playMode !== 'story') return;
     isApplyingRemoteUpdate = true;
     try {
+      if (payload.event === 'story_beat' && payload.eventType) {
+        fireStoryBeat(payload.eventType, { fromRemote: true });
+        return;
+      }
+      if (payload.event === 'time_of_day' && (payload.timeOfDayMode === 'day' || payload.timeOfDayMode === 'night')) {
+        applyTimeOfDayMode(payload.timeOfDayMode, { broadcast: false });
+        return;
+      }
       if (payload.event === 'restart' && Number.isInteger(payload.levelIndex)) {
         loadChapter(payload.levelIndex, { instantBg: false, showStory: false });
+        return;
+      }
+      if (payload.event === 'checkpoint_rollback') {
         return;
       }
       if (Number.isInteger(payload.levelIndex) && payload.levelIndex !== currentLevelIdx) {
         startNewGame(payload.levelIndex, { silent: true, fromRemote: true });
       }
-      if (Array.isArray(payload.switches)) {
-        payload.switches.forEach((rs) => {
-          const sw = levelState.switches.find((s) => s.id === rs.id);
-          if (sw && sw.mode === 'toggle' && sw.toggled !== rs.toggled) {
-            sw.toggled = Boolean(rs.toggled);
-            sw.pressed = sw.toggled;
-          }
-        });
-      }
-      if (Array.isArray(payload.gates)) {
-        payload.gates.forEach((rg) => {
-          const g = levelState.gates.find((item) => item.id === rg.id);
-          if (g && rg.latchedOpen && !g.latchedOpen) {
-            g.latchedOpen = true;
-          }
-        });
-      }
-      if (Array.isArray(payload.keys)) {
-        payload.keys.forEach((rk) => {
-          const key = levelState.keys.find((item) => item.id === rk.id);
-          if (key && rk.collected && !key.collected) {
-            key.collected = true;
-            levelState.keysCollected += 1;
-            audio.playKeyPickup();
-            if (!levelState.portalUnlocked && levelState.keysCollected >= levelState.keysRequired) {
-              levelState.portalUnlocked = true;
-              audio.playDoorUnlock();
-            }
-          }
-        });
-        syncHudStatic();
-      }
-      if (payload.activeCheckpointId) {
-        const cp = levelState.checkpoints.find((c) => c.id === payload.activeCheckpointId);
-        if (cp && !cp.activated) {
-          cp.activated = true;
-          cp.pulse = 1;
-          levelState.activeCheckpoint = {
-            id: cp.id,
-            x: cp.x,
-            y: cp.y,
-            madjid: {
-              x: clamp(cp.x - 28, 8, levelState.worldWidth - PHYSICS.CHAR_W - 8),
-              y: cp.y - PHYSICS.CHAR_H,
-            },
-            nadine: {
-              x: clamp(cp.x + 8, 8, levelState.worldWidth - PHYSICS.CHAR_W - 8),
-              y: cp.y - PHYSICS.CHAR_H,
-            },
-          };
-          audio.playCheckpoint();
-          syncHudStatic();
-        }
-      }
+      restoreStoryProgress(payload, { isLiveEvent: true });
       if (payload.completed && !levelState.completed) {
         levelState.completed = true;
         simCallbacks.onLevelComplete(levelState);
@@ -3234,17 +5771,45 @@ function bootstrapBrowserGame() {
       if (status === 'connected') {
         elCoopConnStatus.classList.add('connected');
         elCoopConnStatus.textContent = `Connected (${url})`;
+        if (pendingResumeRoomCode) {
+          const code = pendingResumeRoomCode;
+          pendingResumeRoomCode = null;
+          setCoopFeedback(`Rejoining saved room ${code}...`, true);
+          coopClient.joinRoom(code, { skinId: selectedSkins.madjid });
+        } else if (pendingQuickJoin) {
+          pendingQuickJoin = false;
+          setCoopFeedback('Searching for first open game session...', true);
+          coopClient.quickJoin({ skinId: selectedSkins[coopCreateCharChoice || 'nadine'] });
+        }
       } else if (status === 'connecting') {
         elCoopConnStatus.classList.add('connecting');
         elCoopConnStatus.textContent = `Connecting to ${url}...`;
       } else {
+        pendingQuickJoin = false;
         elCoopConnStatus.textContent = detail ? `Disconnected: ${detail}` : 'Disconnected';
+        if (elHudPing) elHudPing.textContent = '-- ms';
+      }
+    },
+    onPing(ms) {
+      if (elHudPing) {
+        elHudPing.textContent = `${ms} ms`;
+        elHudPing.classList.toggle('is-good', ms < 90);
+        elHudPing.classList.toggle('is-slow', ms >= 180);
       }
     },
     onRooms(rooms) {
       renderCoopRoomsList(rooms);
     },
     onRoomJoined(msg) {
+      pendingQuickJoin = false;
+      pendingResumeRoomCode = null;
+      clearCoopAdvanceTimer();
+      persistCurrentCoopRoom(msg.room);
+      if (msg.room?.customSkins) {
+        Object.values(msg.room.customSkins).forEach((s) => {
+          if (s && s.id) registerSkin(s);
+        });
+      }
       setCoopFeedback(`Joined "${msg.room.name}" as ${msg.character === 'madjid' ? 'Madjid' : 'Nadine'}.`, true);
       applyRoomSnapshot(msg.room, msg.character);
 
@@ -3274,11 +5839,16 @@ function bootstrapBrowserGame() {
         loadOpenWorld({ instantBg: false, showStory: true, syncedState: msg.room.openWorld });
       } else {
         loadChapter(msg.room.levelIndex || 0, { instantBg: false, showStory: true });
+        if (msg.room.storyProgress) {
+          restoreStoryProgress(msg.room.storyProgress, { isLiveEvent: false });
+        }
       }
+      restoreSavedPlayerStates(msg.room);
       setGameState('playing');
       syncHudStatic();
     },
     onRoomLeft() {
+      clearCoopAdvanceTimer();
       coopSession.active = false;
       coopSession.room = null;
       coopSession.roomCode = null;
@@ -3289,22 +5859,28 @@ function bootstrapBrowserGame() {
       remoteActorTarget.active = false;
       applyCoopUiLock();
       renderCoopSessionPanel();
+      renderLobbyResumePrompt();
       syncHudStatic();
       coopClient.listRooms('');
     },
     onRoomMode(room) {
+      clearCoopAdvanceTimer();
       applyRoomSnapshot(room);
+      persistCurrentCoopRoom(room);
+      closeAllSubModals();
+      activeSubModal = null;
       elChapterClearModal.classList.add('hidden');
       elVictoryModal.classList.add('hidden');
       if (room.mode === 'openworld') {
         loadOpenWorld({ instantBg: false, showStory: true, syncedState: room.openWorld });
       } else {
         loadChapter(room.levelIndex || 0, { instantBg: false, showStory: true });
-      }
-      if (activeSubModal === 'coop') {
-        closeAllSubModals();
+        if (room.storyProgress) {
+          restoreStoryProgress(room.storyProgress, { isLiveEvent: false });
+        }
       }
       setGameState('playing');
+      syncHudStatic();
     },
     onPartnerJoined(msg) {
       applyRoomSnapshot(msg.room);
@@ -3349,6 +5925,15 @@ function bootstrapBrowserGame() {
       remoteActorTarget.inPortal = Boolean(state.inPortal);
       remoteActorTarget.walkDist = Number(state.walkDist) || 0;
       remoteActorTarget.blushTimer = Number(state.blushTimer) || 0;
+      if (typeof state.hp === 'number') {
+        const rActor = levelState.actors[charId];
+        if (rActor) rActor.hp = Math.max(0, Math.min(rActor.maxHp || 100, Math.round(state.hp)));
+      }
+      remoteActorTarget.weapons = Array.isArray(state.weapons) ? state.weapons.slice(0, 6) : [];
+      remoteActorTarget.equippedWeapon = state.equippedWeapon || null;
+      remoteActorTarget.phaseDashActive = Boolean(state.phaseDashActive);
+      remoteActorTarget.phaseRippleTimer = Number(state.phaseRippleTimer) || 0;
+      remoteActorTarget.weaponSwing = state.weaponSwing && state.weaponSwing.weaponId ? state.weaponSwing : null;
     },
     onStorySync(_fromChar, payload) {
       applyRemoteStorySync(payload);
@@ -3405,6 +5990,15 @@ function bootstrapBrowserGame() {
         syncHudStatic();
       }
     },
+    onCustomSkinSaved(charId, skin) {
+      if (!skin || !skin.id) return;
+      registerSkin(skin);
+      if (charId === 'madjid' || charId === 'nadine') {
+        selectedSkins[charId] = getSkin(charId, skin.id).id;
+        syncHudStatic();
+        renderSkinGrid();
+      }
+    },
     onChatMessage(msg) {
       receiveChatMessage(msg, { live: true });
       audio.playChatPing();
@@ -3444,7 +6038,17 @@ function bootstrapBrowserGame() {
         spawnWorldToast(msg.x, msg.y - 16, 'Harmony Resonance! ♥', '#FDE68A');
       }
     },
-    onError(_code, message) {
+    onError(code, message) {
+      pendingQuickJoin = false;
+      const wasResuming = Boolean(pendingResumeRoomCode);
+      pendingResumeRoomCode = null;
+      if (code === 'ROOM_NOT_FOUND') {
+        clearLastCoopRoom(window.localStorage);
+        renderLobbyResumePrompt();
+        if (wasResuming && gameState === 'title') {
+          openCoopModal();
+        }
+      }
       setCoopFeedback(message, false);
     },
     onGhostSync(msg) {
@@ -3478,15 +6082,22 @@ function bootstrapBrowserGame() {
         const stray = levelState.actors[g.strayId];
         if (stray) stray.mood = 'shocked';
       } else if (msg.kind === 'slap') {
-        g.phase = 'slap_run';
+        g.phase = 'phase_dash';
         g.outcome = 'slap';
-        g.timer = 4.5;
-        g.slapCalloutTimer = 1.2;
+        g.timer = 1.4;
+        g.slapCalloutTimer = 1.25;
         g.slapCalloutX = msg.x || g.x;
         g.slapCalloutY = msg.y || g.y;
         audio.playGhostSlap();
         const stray = levelState.actors[g.strayId];
-        if (stray) stray.mood = 'panic';
+        const partner = levelState.actors[g.targetId];
+        if (stray) {
+          stray.mood = 'panic';
+          if (partner) {
+            const tx = clamp(partner.x - (partner.facing || 1) * 32, 8, levelState.worldWidth - stray.w - 8);
+            startPhaseDash(stray, tx, partner.y, 'ghost', levelState.worldWidth);
+          }
+        }
       } else if (msg.kind === 'devour') {
         g.phase = 'devour_fly';
         g.outcome = 'devour';
@@ -3554,6 +6165,31 @@ function bootstrapBrowserGame() {
           spawnWorldToast(rescued.x + rescued.w * 0.5, rescued.y - 16, 'Rescued! ♥', '#93C5FD');
         }
         audio.playEdgeRescue();
+      } else if ((msg.kind === 'block_pickup' || msg.kind === 'block_drop' || msg.kind === 'block_snap') && msg.blockId) {
+        const block = (levelState.carryBlocks || []).find((b) => b.id === msg.blockId);
+        const carrier = msg.carrierId ? levelState.actors[msg.carrierId] : null;
+        if (block) {
+          if (msg.kind === 'block_pickup') {
+            block.carriedBy = msg.carrierId || null;
+            block.placedPedestalId = null;
+            if (carrier) carrier.carryingBlockId = block.id;
+            audio.playCarryPickup();
+          } else {
+            block.carriedBy = null;
+            if (carrier && carrier.carryingBlockId === block.id) carrier.carryingBlockId = null;
+            if (typeof msg.x === 'number') block.x = msg.x;
+            if (typeof msg.y === 'number') block.y = msg.y;
+            block.placedPedestalId = msg.placedPedestalId || null;
+            if (block.placedPedestalId) {
+              const ped = (levelState.carryPedestals || []).find((p) => p.id === block.placedPedestalId);
+              if (ped) {
+                ped.activated = true;
+                ped.occupantBlockId = block.id;
+              }
+            }
+            audio.playCarryDrop();
+          }
+        }
       }
     },
     onDanceSync(msg) {
@@ -3607,6 +6243,10 @@ function bootstrapBrowserGame() {
         if (bossState) {
           const prevHp = bossState.hp;
           applyBossSnapshot(bossState, msg.boss);
+          if (bossState.defeated) {
+            levelState.bossDefeated = true;
+            levelState.portalUnlocked = computePortalUnlocked(levelState);
+          }
           if (bossState.hp < prevHp) {
             if (bossState.defeated) audio.playBossDefeat();
             else audio.playBossHit();
@@ -3614,6 +6254,68 @@ function bootstrapBrowserGame() {
           syncBossBarHud();
         }
       }
+    },
+    onHpRespawn(msg) {
+      if (!msg || !coopSession.active) return;
+      if (msg.kind === 'zero_hp') {
+        levelState.gameOver = true;
+        if (elTryAgainReason) {
+          elTryAgainReason.textContent = 'A partner fell! Respawn together at your last checkpoint.';
+        }
+        elTryAgainModal?.classList.remove('hidden');
+      } else if (msg.kind === 'respawn') {
+        elTryAgainModal?.classList.add('hidden');
+        if (levelState.escapeState && !levelState.escapeState.cleared) {
+          levelState.escapeState.active = false;
+          levelState.escapeState.wallX = levelState.escapeState.wallStartX;
+          levelState.escapeState.timeRemaining = levelState.escapeState.timeLimitSec;
+        }
+        elHudEscapeBanner?.classList.add('hidden');
+        triggerTeamRespawnAtCheckpoint(levelState, simCallbacks);
+        syncHealthHud();
+        syncHudStatic();
+        syncBossBarHud();
+      }
+    },
+    onPuzzleSync(msg) {
+      if (!msg || !coopSession.active || !msg.puzzleId) return;
+      const pz = (levelState.puzzles || []).find((p) => p.id === msg.puzzleId);
+      if (!pz) return;
+      pz.solved = Boolean(msg.solved);
+      if (Array.isArray(msg.enteredOrder)) pz.enteredOrder = msg.enteredOrder.slice();
+      if (Array.isArray(msg.nodes)) {
+        msg.nodes.forEach((rn) => {
+          const node = (pz.nodes || []).find((n) => n.id === rn.id);
+          if (node) {
+            if (typeof rn.glyphIndex === 'number') node.glyphIndex = rn.glyphIndex;
+            node.activated = Boolean(rn.activated);
+          }
+        });
+      }
+      if (pz.solved) {
+        unlockPuzzleTarget(levelState, pz);
+        if (pz.targetGateId) {
+          const g = levelState.gates.find((item) => item.id === pz.targetGateId);
+          if (g) g.openProgress = 1;
+        }
+      }
+    },
+    onMonsterSync(msg) {
+      if (!msg || !coopSession.active || !msg.monsterId) return;
+      const m = (levelState.monsters || []).find((mon) => mon.id === msg.monsterId);
+      if (!m) return;
+      if (typeof msg.hp === 'number') m.hp = msg.hp;
+      if (typeof msg.defeated === 'boolean') {
+        m.defeated = msg.defeated;
+        if (m.defeated) m.koTimer = 0;
+      }
+    },
+    onBarrierSync(msg) {
+      if (!msg || !coopSession.active || !msg.barrierId) return;
+      const b = (levelState.fragileBarriers || []).find((item) => item.id === msg.barrierId);
+      if (!b) return;
+      if (typeof msg.hp === 'number') b.hp = msg.hp;
+      if (typeof msg.broken === 'boolean') b.broken = msg.broken;
     },
     onWeatherSync(msg) {
       if (!msg || !coopSession.active || !msg.weather) return;
@@ -3684,8 +6386,352 @@ function bootstrapBrowserGame() {
     setGameState(modalReturnState);
   }
 
+  const bossCallbacks = {
+    onBossShieldBreak(b) {
+      audio.playSwitchPress();
+      spawnWorldToast(b.x + b.w * 0.5, b.y - 14, 'Shield Shattered!', '#7CC4FA');
+      particles.burst(b.x + b.w * 0.5, b.y + b.h * 0.5, 16, {
+        colors: ['#7CC4FA', '#FFFFFF', '#FDE047'],
+        minSpeed: 65,
+        maxSpeed: 175,
+        size: 4.5,
+        shape: 'spark',
+        gravity: 60,
+      });
+    },
+    onBossShieldDeflect(b, actor) {
+      audio.playSwitchRelease();
+      if (actor) {
+        spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 14, 'Team Up or Hammer Shield!', '#93C5FD');
+      }
+    },
+    onBossHit(b) {
+      hitstopTimer = 0.055;
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.45);
+      audio.playBossHit();
+      particles.burst(b.x + b.w * 0.5, b.y, 18, {
+        colors: ['#FDE047', '#FB923C', '#FFFFFF'],
+        minSpeed: 70,
+        maxSpeed: 195,
+        size: 5,
+        shape: 'spark',
+        gravity: 110,
+      });
+      spawnWorldToast(b.x + b.w * 0.5, b.y - 20, `${b.hp}/${b.maxHp} HP`, '#FDE047');
+      syncBossBarHud();
+    },
+    onBossDefeat(b) {
+      hitstopTimer = 0.08;
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.7);
+      audio.playBossDefeat();
+      particles.burst(b.x + b.w * 0.5, b.y + b.h * 0.4, 30, {
+        colors: ['#FDE047', '#F472B6', '#7CC4FA', '#FFF8D6'],
+        minSpeed: 80,
+        maxSpeed: 240,
+        size: 5.5,
+        shape: 'heart',
+        gravity: 75,
+        life: 1.35,
+      });
+      spawnWorldToast(b.x + b.w * 0.5, b.y - 24, `${b.name} Defeated!`, '#FDE047');
+      levelState.bossDefeated = true;
+      levelState.portalUnlocked = computePortalUnlocked(levelState);
+      syncBossBarHud();
+      syncHudStatic();
+      renderOpenWorldToolbar();
+      fireStoryBeat('boss_down');
+      if (coopSession.active) {
+        coopClient.sendBossSync({ kind: 'state', boss: serializeBossState(b) });
+      }
+      broadcastStorySnapshot('boss');
+    },
+    onPortalUnlock(exit) {
+      simCallbacks.onPortalUnlock(exit);
+      syncHudStatic();
+    },
+    onDamage(info) {
+      simCallbacks.onDamage(info);
+    },
+    onHeal(info) {
+      simCallbacks.onHeal(info);
+    },
+    onCry(info) {
+      simCallbacks.onCry(info);
+    },
+    onZeroHp(info) {
+      simCallbacks.onZeroHp(info);
+    },
+  };
+
   // Simulation Callbacks (Weight-Scaled Audio + Zero-GC Particle Juice + Micro-Hitstop)
   const simCallbacks = {
+    get mechState() {
+      return mechState || null;
+    },
+    get ghostState() {
+      return mechState?.ghost || null;
+    },
+    get bossState() {
+      return bossState || null;
+    },
+    onCatDiscovered(cat) {
+      audio.playCatMeow(false);
+      if (cat) {
+        particles.burst(cat.x + cat.w * 0.5, cat.y, 12, {
+          colors: ['#FDE68A', '#F9A8D4', '#FFF8D6'],
+          minSpeed: 30,
+          maxSpeed: 95,
+          size: 4.4,
+          shape: 'heart',
+          gravity: -16,
+        });
+        spawnWorldToast(cat.x + cat.w * 0.5, cat.y - 22, 'Mimi Joined Your Journey! ♥', '#FDE68A');
+      }
+      fireStoryBeat('cat_found');
+    },
+    onCatTrapAlert() {
+      audio.playCatMeow(true);
+      fireStoryBeat('trap_warning');
+    },
+    onCatHeart() {
+      audio.playCatPurr();
+    },
+    onPickup(picked, actor) {
+      const def = getWeaponDef(picked.weaponId);
+      audio.playKeyPickup();
+      particles.burst(picked.x, picked.y, 12, {
+        colors: [def.primary, def.secondary, '#FFFFFF'],
+        minSpeed: 40,
+        maxSpeed: 135,
+        size: 4.2,
+        shape: 'spark',
+        gravity: 60,
+      });
+      spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 18, `${def.name}!`, def.secondary);
+      syncHudStatic();
+      broadcastStorySnapshot('weapon');
+    },
+    onSwing(actor, def) {
+      audio.playSwitchRelease();
+      particles.burst(actor.x + actor.w * 0.5 + (actor.facing || 1) * 20, actor.y + actor.h * 0.45, 5, {
+        colors: [def.primary, def.secondary],
+        minSpeed: 30,
+        maxSpeed: 90,
+        size: 3.2,
+        shape: 'spark',
+        gravity: 30,
+      });
+    },
+    onBarrierHit(b) {
+      hitstopTimer = 0.035;
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.28);
+      audio.playSwitchPress();
+      if (coopSession.active) {
+        coopClient.sendBarrierSync({ barrierId: b.id, hp: b.hp, broken: Boolean(b.broken) });
+      }
+      if (b.broken) {
+        spawnWorldToast(b.x + b.w * 0.5, b.y - 14, 'Barrier Shattered!', '#BAE6FD');
+        broadcastStorySnapshot('weapon');
+      }
+    },
+    onBarrierWrongTool(b, actor) {
+      audio.playSwitchRelease();
+      const target = actor || levelState.actors[activeCharId];
+      if (target) {
+        const toolLabel = b.requiredWeapon === 'crystal_hammer'
+          ? 'Crystal Hammer'
+          : b.requiredWeapon === 'energy_wand'
+            ? 'Energy Wand'
+            : 'Light Sword';
+        spawnWorldToast(target.x + target.w * 0.5, target.y - 18, `Requires ${toolLabel}!`, '#FCA5A5');
+      }
+    },
+    onBossWeaponHit(boss, actor, def) {
+      damageBossWithWeapon(boss, actor, def, levelState, bossCallbacks);
+    },
+    onMonsterHit({ monster }) {
+      hitstopTimer = 0.03;
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.22);
+      audio.playSwitchPress();
+      if (coopSession.active && monster) {
+        coopClient.sendMonsterSync({ monsterId: monster.id, hp: monster.hp, defeated: Boolean(monster.defeated) });
+      }
+    },
+    onMonsterDefeat({ monster }) {
+      hitstopTimer = 0.045;
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.35);
+      audio.playBossHit();
+      if (monster) {
+        particles.burst(monster.x + monster.w * 0.5, monster.y + monster.h * 0.5, 16, {
+          colors: ['#6EE7B7', '#FDE047', '#FFFFFF'],
+          minSpeed: 50,
+          maxSpeed: 155,
+          size: 4.5,
+          shape: 'spark',
+          gravity: 80,
+        });
+        spawnWorldToast(monster.x + monster.w * 0.5, monster.y - 18, '+35 HP Orb!', '#6EE7B7');
+        if (coopSession.active) {
+          coopClient.sendMonsterSync({ monsterId: monster.id, hp: 0, defeated: true });
+        }
+      }
+      broadcastStorySnapshot('monster');
+    },
+    onEnemyHit(en) {
+      hitstopTimer = 0.03;
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.22);
+      audio.playSwitchPress();
+      spawnWorldToast(en.x + en.w * 0.5, en.y - 14, 'Stunned!', '#FDE68A');
+    },
+    onDamage({ actor }) {
+      hitstopTimer = 0.04;
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.36);
+      audio.playCry(actor?.id || 'madjid');
+      syncHealthHud();
+    },
+    onHeal() {
+      syncHealthHud();
+    },
+    onOrbPickup({ actor }) {
+      audio.playKeyPickup();
+      if (actor) {
+        particles.burst(actor.x + actor.w * 0.5, actor.y + actor.h * 0.4, 10, {
+          colors: ['#6EE7B7', '#A7F3D0', '#FFFFFF'],
+          minSpeed: 35,
+          maxSpeed: 95,
+          size: 4,
+          shape: 'spark',
+          gravity: -20,
+        });
+      }
+      syncHealthHud();
+    },
+    onZeroHp({ actor, cause }) {
+      cancelCarry(mechState, levelState);
+      syncHealthHud();
+      if (elTryAgainReason) {
+        const who = actor?.id === 'nadine' ? 'Nadine' : 'Madjid';
+        elTryAgainReason.textContent = `${who} reached 0 HP (${cause || 'Hazard'}). Respawning together at the last Checkpoint...`;
+      }
+      elTryAgainModal?.classList.remove('hidden');
+      if (coopSession.active) {
+        coopClient.sendHpRespawn({ kind: 'zero_hp', actorId: actor?.id || 'madjid', cause });
+      }
+    },
+    onEscapeStart(esc) {
+      audio.playGhostWarn();
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.45);
+      if (esc) {
+        spawnWorldToast(esc.triggerX, 460, esc.title || 'Escape Surge!', '#FCA5A5');
+      }
+    },
+    onEscapeClear(esc) {
+      audio.playDoorUnlock();
+      elHudEscapeBanner?.classList.add('hidden');
+      if (esc) {
+        spawnWorldToast(esc.endX, 460, 'Escape Cleared Together! ♥', '#6EE7B7');
+      }
+      fireStoryBeat('escape_clear');
+    },
+    onEscapeFail(esc) {
+      audio.playCry('madjid');
+      cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.4);
+      elHudEscapeBanner?.classList.add('hidden');
+      resetCatToTeam(levelState.cat, levelState);
+      syncHealthHud();
+      syncHudStatic();
+      syncBossBarHud();
+      if (esc) {
+        const dest = levelState.activeCheckpoint || levelState.spawns?.madjid;
+        spawnWorldToast(dest?.x || esc.triggerX, 480, 'Surge Caught You — Respawned!', '#FCA5A5');
+      }
+      if (coopSession.active) {
+        broadcastStorySnapshot('checkpoint_rollback', { replace: true });
+        coopClient.sendHpRespawn({ kind: 'respawn' });
+      }
+    },
+    onPuzzleStep({ node }) {
+      audio.playSwitchPress();
+      if (node) {
+        particles.burst(node.x + node.w * 0.5, node.y - node.h * 0.5, 8, {
+          colors: ['#7DD3FC', '#FDE68A', '#FFFFFF'],
+          minSpeed: 35,
+          maxSpeed: 95,
+          size: 3.6,
+          shape: 'spark',
+          gravity: 40,
+        });
+      }
+    },
+    onPuzzleSolved({ puzzle }) {
+      audio.playDoorUnlock();
+      hitstopTimer = 0.04;
+      if (puzzle) {
+        spawnWorldToast(puzzle.tabletX, puzzle.tabletY - 56, 'Ancient Seal Unlocked!', '#6EE7B7');
+      }
+      fireStoryBeat('puzzle_solved');
+      if (coopSession.active && puzzle) {
+        coopClient.sendPuzzleSync({
+          puzzleId: puzzle.id,
+          solved: true,
+          nodes: puzzle.nodes.map((n) => ({
+            id: n.id,
+            glyphIndex: n.glyphIndex,
+            activated: n.activated,
+          })),
+          enteredOrder: puzzle.enteredOrder,
+        });
+      }
+      broadcastStorySnapshot('puzzle');
+    },
+    onPuzzleMismatch({ node }) {
+      audio.playSwitchRelease();
+      if (node) {
+        spawnWorldToast(node.x + node.w * 0.5, node.y - node.h - 14, 'Seal Reset!', '#FCA5A5');
+      }
+    },
+    onArrowFire(trap) {
+      audio.playSwitchRelease();
+      if (trap) {
+        particles.burst(trap.x + (trap.dir > 0 ? trap.w : 0), trap.y + trap.h * 0.5, 4, {
+          colors: ['#FDE68A', '#F97316'],
+          minSpeed: 20,
+          maxSpeed: 70,
+          size: 3,
+          shape: 'spark',
+          gravity: 40,
+        });
+      }
+    },
+    onBlockSnapBack(block) {
+      audio.playRespawn();
+      if (block) {
+        spawnWorldToast(block.x + block.w * 0.5, block.y - 16, 'Relic Returned!', '#FDE68A');
+      }
+      broadcastStorySnapshot('blocks');
+    },
+    onGhostHit(g, _actor, def) {
+      if (repelGhostWithWeapon(mechState, levelState)) {
+        hitstopTimer = 0.06;
+        cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.45);
+        audio.playGhostSlap();
+        particles.burst(g.x, g.y, 20, {
+          colors: [def.primary, def.secondary, '#FFFFFF'],
+          minSpeed: 70,
+          maxSpeed: 210,
+          size: 5,
+          shape: 'spark',
+          gravity: 40,
+        });
+        spawnWorldToast(g.x, g.y - 18, 'Ghost Banished!', def.secondary);
+        if (coopSession.active) {
+          coopClient.sendGhostSync({
+            kind: 'reunited',
+            strayId: g.strayId || 'madjid',
+          });
+        }
+      }
+    },
     onJump(actor) {
       audio.playJump(actor.id);
       const skin = getSkin(actor.id, selectedSkins[actor.id]);
@@ -3713,7 +6759,7 @@ function bootstrapBrowserGame() {
         gravity: 140,
       });
     },
-    onCheckpoint(cp) {
+    onCheckpoint(cp, visitor, respawnPayload) {
       audio.playCheckpoint();
       hitstopTimer = 0.03;
       particles.burst(cp.x, cp.y - 34, 16, {
@@ -3726,10 +6772,50 @@ function bootstrapBrowserGame() {
         life: 0.72,
       });
       spawnWorldToast(cp.x, cp.y - 56, 'Checkpoint!', '#FFE89E');
+
+      // Dual-player Phase-Warp: bring far-away or gate/barrier-blocked partner to checkpoint cleanly
+      if (visitor && respawnPayload && (!coopSession.active || !coopSession.partnerConnected || coopSession.localCharId === visitor.id)) {
+        const partnerId = visitor.id === 'madjid' ? 'nadine' : 'madjid';
+        const partner = levelState.actors[partnerId];
+        if (partner && !partner.phaseDash?.active && !partner.devouredByGhost && partner.hurtTimer <= 0) {
+          const dist = Math.hypot(partner.x - cp.x, partner.y - cp.y);
+          const minX = Math.min(partner.x, cp.x);
+          const maxX = Math.max(partner.x + partner.w, cp.x);
+          const blockedByGate = levelState.gates.some(
+            (g) => !g.latchedOpen && g.openProgress < 0.7 && g.x + g.w >= minX && g.x <= maxX
+          );
+          const blockedByBarrier = (levelState.fragileBarriers || []).some(
+            (b) => !b.broken && b.x + b.w >= minX && b.x <= maxX
+          );
+          if (dist > 280 || blockedByGate || blockedByBarrier) {
+            cancelCarry(mechState, levelState);
+            startPhaseDash(partner, respawnPayload[partnerId].x, respawnPayload[partnerId].y, 'checkpoint', levelState.worldWidth);
+            spawnWorldToast(partner.x + partner.w * 0.5, partner.y - 18, 'Phase-Warping!', '#BAE6FD');
+          }
+        }
+      }
+
+      if (!coopSession.active) {
+        persistSoloCheckpointSnapshot(cp.label || null);
+      } else {
+        persistCurrentCoopRoom(coopSession.room);
+      }
       syncHudStatic();
+      syncHealthHud();
+      fireStoryBeat('checkpoint_lit');
       broadcastStorySnapshot('checkpoint');
     },
-    onCry(actor) {
+    onCheckpointLocked(cp) {
+      const nowMs = performance.now();
+      if (nowMs - lastCheckpointLockedToastAt > 2200) {
+        lastCheckpointLockedToastAt = nowMs;
+        audio.playSwitchRelease();
+        spawnWorldToast(cp.x, cp.y - 68, 'Solve Seal Puzzle First!', '#FBBF24');
+      }
+    },
+    onCry(payload) {
+      const actor = payload?.actor || payload;
+      if (!actor) return;
       cancelCarry(mechState, levelState);
       audio.playCry(actor.id);
       cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.28);
@@ -3762,17 +6848,24 @@ function bootstrapBrowserGame() {
         });
       });
     },
-    onRespawn(actor) {
+    onRespawn(payload) {
       cancelCarry(mechState, levelState);
+      resetCatToTeam(levelState.cat, levelState);
       audio.playRespawn();
-      particles.burst(actor.x + actor.w * 0.5, actor.y + actor.h * 0.5, 12, {
-        colors: ['#FFF8E8', '#FFE299', '#A8E0FF'],
-        minSpeed: 35,
-        maxSpeed: 105,
-        size: 4,
-        shape: 'spark',
-        gravity: 35,
-      });
+      const actor = payload?.actor || payload?.state?.actors?.[activeCharId] || payload?.state?.actors?.madjid || levelState.actors[activeCharId];
+      if (actor && typeof actor.x === 'number' && typeof actor.y === 'number') {
+        particles.burst(actor.x + actor.w * 0.5, actor.y + actor.h * 0.5, 12, {
+          colors: ['#FFF8E8', '#FFE299', '#A8E0FF'],
+          minSpeed: 35,
+          maxSpeed: 105,
+          size: 4,
+          shape: 'spark',
+          gravity: 35,
+        });
+      }
+      syncHudStatic();
+      syncBossBarHud();
+      syncHealthHud();
     },
     onKiss(midX, midY) {
       audio.playKiss();
@@ -3904,7 +6997,10 @@ function bootstrapBrowserGame() {
       totalKeysCollectedRun += snapshot.keysCollected;
       const lvl = LEVELS[currentLevelIdx];
       clearedLevelIds.add(lvl.id);
+      progressionState = completeWorldInProgression(progressionState, lvl.worldId, WORLDS.length);
+      lobbySelectedWorldId = Math.min(WORLDS.length, Math.max(lobbySelectedWorldId, progressionState.highestUnlockedWorld));
       savePreferences();
+      renderLobbyWorldMap();
 
       const isFinalChapter = currentLevelIdx >= LEVELS.length - 1;
 
@@ -3921,12 +7017,57 @@ function bootstrapBrowserGame() {
       });
 
       if (isFinalChapter) {
-        audio.playJourneyComplete();
-        document.getElementById('victory-chapters-val').textContent = `${WORLDS.length}/${WORLDS.length}`;
-        document.getElementById('victory-time-val').textContent = formatTime(totalJourneyTime);
-        document.getElementById('victory-keys-val').textContent = `${LEVELS.length}/${LEVELS.length}`;
-        setGameState('gameover');
-        elVictoryModal.classList.remove('hidden');
+        clearSoloCheckpointSnapshot(window.localStorage);
+        renderLobbyResumePrompt();
+        if (snapshot.exit?.isWeddingArch && !weddingCeremony?.active) {
+          weddingCeremony = {
+            active: true,
+            timer: 0,
+            duration: 3.45,
+            snapshot: {
+              elapsed: snapshot.elapsed,
+              keysCollected: snapshot.keysCollected,
+            },
+          };
+          levelState.actors.madjid.weddingCeremony = true;
+          levelState.actors.nadine.weddingCeremony = true;
+          levelState.actors.madjid.hurtTimer = 0;
+          levelState.actors.nadine.hurtTimer = 0;
+          levelState.actors.madjid.danceStyle = 'waltz';
+          levelState.actors.nadine.danceStyle = 'waltz';
+          levelState.actors.madjid.mood = 'kissing';
+          levelState.actors.nadine.mood = 'kissing';
+          audio.playJourneyComplete();
+          fireStoryBeat('wedding_vow');
+          showCaption('Madjid & Nadine stand hand-in-hand beneath the Coral Wedding Arch!', 3400);
+          spawnWorldToast(ex, ey - 42, 'Married Beneath the Coral Arch ♥', '#FDE68A');
+        } else {
+          audio.playJourneyComplete();
+          document.getElementById('victory-chapters-val').textContent = `${WORLDS.length}/${WORLDS.length}`;
+          document.getElementById('victory-time-val').textContent = formatTime(totalJourneyTime);
+          document.getElementById('victory-keys-val').textContent = `${LEVELS.length}/${LEVELS.length}`;
+          setGameState('gameover');
+          elVictoryModal.classList.remove('hidden');
+        }
+      } else if (coopSession.active) {
+        // Seamless Co-op Transition: never trap players behind a blocking chapter-clear modal
+        audio.playLevelComplete();
+        showCaption(`${lvl.worldName} · Stage ${lvl.code} Cleared! Advancing together...`, 3200);
+        spawnWorldToast(ex, ey - 28, 'Stage Cleared! Next World...', '#FDE68A');
+        clearCoopAdvanceTimer();
+        const canHostAdvance =
+          coopSession.room?.hostClientId === coopClient.getClientId() ||
+          !coopSession.partnerConnected ||
+          (!coopSession.room?.hostClientId && coopSession.localCharId === 'madjid');
+        if (canHostAdvance) {
+          const nextIdx = currentLevelIdx + 1;
+          coopAdvanceTimer = window.setTimeout(() => {
+            coopAdvanceTimer = null;
+            if (coopSession.active) {
+              coopClient.setRoomMode({ mode: 'story', levelIndex: nextIdx, reset: true });
+            }
+          }, 950);
+        }
       } else {
         audio.playLevelComplete();
         document.getElementById('clear-kicker').textContent = `${lvl.worldName} · Stage ${lvl.code} Complete`;
@@ -3965,10 +7106,23 @@ function bootstrapBrowserGame() {
       return;
     }
 
+    if (gameState === 'dedication') {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+        e.preventDefault();
+        setGameState('title');
+      }
+      return;
+    }
+
     if (gameState === 'title' && !activeSubModal) {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        startNewGame(0);
+        if (lobbyModeChoice === 'coop' && !coopSession.active) {
+          openCoopModal();
+        } else {
+          const idx = LEVELS.findIndex((l) => l.worldId === lobbySelectedWorldId);
+          startNewGame(idx >= 0 ? idx : 0);
+        }
       }
       return;
     }
@@ -4002,11 +7156,13 @@ function bootstrapBrowserGame() {
     if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
       e.preventDefault();
       if (gameState === 'playing') {
-        if (elDancePopover && !elDancePopover.classList.contains('hidden')) {
+        if (elSettingsDrawer && !elSettingsDrawer.classList.contains('hidden')) {
+          toggleSettingsDrawer(false);
+        } else if (elDancePopover && !elDancePopover.classList.contains('hidden')) {
           toggleDancePopover(false);
         } else if (!elChatBox.classList.contains('hidden')) {
           toggleChatBox(false);
-        } else {
+        } else if (!levelState.gameOver) {
           setGameState('paused');
         }
       } else if (gameState === 'paused') {
@@ -4018,6 +7174,9 @@ function bootstrapBrowserGame() {
     if (e.key === 'm' || e.key === 'M') {
       e.preventDefault();
       audio.toggleMute();
+      if (!audio.isMuted()) {
+        audio.unlock();
+      }
       syncMuteUI();
       return;
     }
@@ -4038,13 +7197,38 @@ function bootstrapBrowserGame() {
 
     if (e.key === 'g' || e.key === 'G') {
       e.preventDefault();
-      toggleDancePopover();
+      triggerOneTapDance();
+      return;
+    }
+
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyC') {
+      e.preventDefault();
+      triggerLocalDash();
       return;
     }
 
     if (e.key === 'f' || e.key === 'F') {
       e.preventDefault();
       handleSnapPhoto();
+      return;
+    }
+
+    if (e.code === 'KeyX' || e.code === 'KeyJ') {
+      e.preventDefault();
+      handleWeaponUse();
+      return;
+    }
+
+    if (e.code === 'KeyQ') {
+      e.preventDefault();
+      handleWeaponCycle();
+      return;
+    }
+
+    if (e.key === 'h' || e.key === 'H') {
+      e.preventDefault();
+      audio.playUiClick();
+      toggleHudCollapsed();
       return;
     }
 
@@ -4100,10 +7284,12 @@ function bootstrapBrowserGame() {
       code === 'ArrowLeft' ||
       code === 'ArrowRight' ||
       code === 'ArrowUp' ||
+      code === 'ArrowDown' ||
       code === 'Space' ||
       code === 'KeyA' ||
       code === 'KeyD' ||
-      code === 'KeyW'
+      code === 'KeyW' ||
+      code === 'KeyS'
     ) {
       e.preventDefault();
       const wasJumpKey = keysHeld.has('Space') || keysHeld.has('ArrowUp') || keysHeld.has('KeyW');
@@ -4128,6 +7314,7 @@ function bootstrapBrowserGame() {
   window.addEventListener('blur', clearInputs);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) clearInputs();
+    audio.setTabHidden(document.hidden);
   });
 
   // Multi-Touch On-Screen Controls
@@ -4136,6 +7323,7 @@ function bootstrapBrowserGame() {
   function updateTouchAction(action, pressed) {
     if (action === 'left') touchHeld.left = pressed;
     if (action === 'right') touchHeld.right = pressed;
+    if (action === 'down') touchHeld.down = pressed;
     if (action === 'jump') {
       if (pressed && !touchHeld.jump) localJumpJustPressed = true;
       if (!pressed && touchHeld.jump) localJumpJustReleased = true;
@@ -4165,6 +7353,34 @@ function bootstrapBrowserGame() {
         return;
       }
 
+      if (action === 'weapon') {
+        btn.classList.add('pressed');
+        handleWeaponUse();
+        window.setTimeout(() => btn.classList.remove('pressed'), 120);
+        return;
+      }
+
+      if (action === 'weapon-cycle') {
+        btn.classList.add('pressed');
+        handleWeaponCycle();
+        window.setTimeout(() => btn.classList.remove('pressed'), 120);
+        return;
+      }
+
+      if (action === 'dance') {
+        btn.classList.add('pressed');
+        triggerOneTapDance();
+        window.setTimeout(() => btn.classList.remove('pressed'), 120);
+        return;
+      }
+
+      if (action === 'dash') {
+        btn.classList.add('pressed');
+        triggerLocalDash();
+        window.setTimeout(() => btn.classList.remove('pressed'), 120);
+        return;
+      }
+
       btn.setPointerCapture?.(e.pointerId);
       activePointerActions.set(e.pointerId, { action, btn });
       btn.classList.add('pressed');
@@ -4187,10 +7403,108 @@ function bootstrapBrowserGame() {
     btn.addEventListener('pointercancel', releasePointer);
   });
 
-  // Title, HUD, Modal, Open-World, Co-op & Chat DOM Handlers
-  document.getElementById('btn-start-journey').addEventListener('click', (e) => {
+  elBtnDedicationContinue?.addEventListener('click', (e) => {
     e.currentTarget.blur();
-    startNewGame(0);
+    audio.unlock();
+    audio.playUiClick();
+    setGameState('title');
+  });
+
+  // Title / Journey Lobby, HUD, Modal, Open-World, Co-op & Chat DOM Handlers
+  elBtnLobbyModeSolo?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    lobbyModeChoice = 'solo';
+    syncLobbyModeButtons();
+  });
+  elBtnLobbyModeCoop?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    lobbyModeChoice = 'coop';
+    syncLobbyModeButtons();
+  });
+  elBtnLobbyBgmToggle?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.toggleMusicEnabled();
+    if (audio.isMusicEnabled() && !audio.isMuted()) {
+      audio.unlock();
+    }
+    audio.playUiClick();
+    syncMuteUI();
+  });
+  elBtnLobbyBgmNext?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    audio.nextBgmTrack();
+    syncMuteUI();
+  });
+  elBtnLobbyDay?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    applyTimeOfDayMode('day', { broadcast: true });
+  });
+
+  elBtnLobbyNight?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    applyTimeOfDayMode('night', { broadcast: true });
+  });
+
+  elBtnLobbyTouchToggle?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    applyTouchPadMode(touchPadMode === 'off' ? 'on' : 'off');
+  });
+
+  elBtnResumeSaved?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    const desc = getSavedResumeDescriptor();
+    const kind = elBtnResumeSaved.dataset.resumeKind || desc.primary;
+    if (kind === 'coop' && desc.coop) {
+      resumeSavedCoopRoom(desc.coop);
+    } else if (desc.solo) {
+      resumeSavedSoloSnapshot(desc.solo);
+    }
+  });
+
+  elBtnResumeAlt?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    const desc = getSavedResumeDescriptor();
+    const kind = elBtnResumeAlt.dataset.resumeKind || 'coop';
+    if (kind === 'coop' && desc.coop) {
+      resumeSavedCoopRoom(desc.coop);
+    } else if (desc.solo) {
+      resumeSavedSoloSnapshot(desc.solo);
+    }
+  });
+
+  elBtnResumeFresh?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    resumePromptDismissed = true;
+    renderLobbyResumePrompt();
+    document.querySelector('.lobby-world-card:not(:disabled)')?.focus?.();
+  });
+
+  elBtnStartJourney?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    if (lobbyModeChoice === 'coop' && !coopSession.active) {
+      openCoopModal();
+      return;
+    }
+    const idx = LEVELS.findIndex((l) => l.worldId === lobbySelectedWorldId);
+    startNewGame(idx >= 0 ? idx : 0);
   });
   document.getElementById('btn-title-coop').addEventListener('click', openCoopModal);
   document.getElementById('btn-title-skins').addEventListener('click', openSkinsModal);
@@ -4257,6 +7571,27 @@ function bootstrapBrowserGame() {
   elMuteBtn.addEventListener('click', (e) => {
     e.currentTarget.blur();
     audio.toggleMute();
+    if (!audio.isMuted()) {
+      audio.unlock();
+    }
+    syncMuteUI();
+  });
+
+  elDrawerBtnBgmToggle?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.toggleMusicEnabled();
+    if (audio.isMusicEnabled() && !audio.isMuted()) {
+      audio.unlock();
+    }
+    audio.playUiClick();
+    syncMuteUI();
+  });
+
+  elDrawerBtnBgmNext?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    audio.nextBgmTrack();
     syncMuteUI();
   });
 
@@ -4305,6 +7640,7 @@ function bootstrapBrowserGame() {
     audio.playUiClick();
     toggleChatBox(false);
     if (coopSession.active) {
+      clearLastCoopRoom(window.localStorage);
       coopClient.leaveRoom();
     }
     loadChapter(0, { instantBg: false, showStory: false });
@@ -4333,14 +7669,242 @@ function bootstrapBrowserGame() {
   elHudBtnDance?.addEventListener('click', (e) => {
     e.currentTarget.blur();
     audio.unlock();
+    triggerOneTapDance();
+  });
+
+  elHudBtnDanceStyles?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
     audio.playUiClick();
     toggleDancePopover();
+  });
+
+  elHudBtnDash?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    triggerLocalDash();
+  });
+
+  elHudBtnCollapse?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    toggleHudCollapsed();
+  });
+
+  elTouchHubToggle?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    toggleTouchActionHub();
+  });
+
+  elHudBtnSettings?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    toggleSettingsDrawer();
+  });
+
+  elBtnCloseSettings?.addEventListener('click', () => {
+    audio.playUiClick();
+    toggleSettingsDrawer(false);
+  });
+
+  document.querySelectorAll('[data-drawer-tab]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.currentTarget.blur();
+      audio.unlock();
+      audio.playUiClick();
+      switchDrawerTab(btn.dataset.drawerTab || 'room');
+    });
+  });
+
+  elDrawerBtnOpenWorld?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    toggleSettingsDrawer(false);
+    closeAllSubModals();
+    if (coopSession.active) {
+      coopClient.setRoomMode({ mode: 'openworld' });
+    } else {
+      loadOpenWorld({ instantBg: false, showStory: true });
+      setGameState('playing');
+    }
+  });
+
+  elDrawerBtnLeaveRoom?.addEventListener('click', () => {
+    audio.playUiClick();
+    clearLastCoopRoom(window.localStorage);
+    coopClient.leaveRoom();
+    toggleSettingsDrawer(false);
+  });
+
+  elBtnDrawerWorldsModal?.addEventListener('click', () => {
+    toggleSettingsDrawer(false);
+    openChaptersModal();
+  });
+
+  elDrawerBtnResetProgress?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.playUiClick();
+    if (!resetProgressArmed) {
+      resetProgressArmed = true;
+      elDrawerBtnResetProgress.classList.add('is-confirm');
+      elDrawerBtnResetProgress.textContent = 'Click Again to Confirm Reset';
+      if (resetProgressArmTimer) window.clearTimeout(resetProgressArmTimer);
+      resetProgressArmTimer = window.setTimeout(() => {
+        resetProgressArmed = false;
+        if (elDrawerBtnResetProgress) {
+          elDrawerBtnResetProgress.classList.remove('is-confirm');
+          elDrawerBtnResetProgress.textContent = 'Reset World Progress';
+        }
+      }, 4000);
+      return;
+    }
+
+    if (resetProgressArmTimer) {
+      window.clearTimeout(resetProgressArmTimer);
+      resetProgressArmTimer = null;
+    }
+    resetProgressArmed = false;
+    elDrawerBtnResetProgress.classList.remove('is-confirm');
+    elDrawerBtnResetProgress.textContent = 'Reset World Progress';
+
+    progressionState = resetProgression(window.localStorage);
+    clearSoloCheckpointSnapshot(window.localStorage);
+    clearLastCoopRoom(window.localStorage);
+    clearedLevelIds.clear();
+    lobbySelectedWorldId = 1;
+    savePreferences();
+    renderLobbyWorldMap();
+    renderLobbyResumePrompt();
+    renderDrawerWorldsList();
+    renderChaptersList();
+    toggleSettingsDrawer(false);
+    startNewGame(0, { silent: true });
+    const lead = levelState.actors?.madjid;
+    if (lead) {
+      spawnWorldToast(lead.x + 20, lead.y - 24, 'World Progress Reset!', '#FCA5A5');
+    }
+  });
+
+  elDrawerBtnTouchCycle?.addEventListener('click', () => {
+    elPauseTouchToggle?.click();
+  });
+
+  elHudBtnTouchToggle?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playUiClick();
+    applyTouchPadMode(touchPadMode === 'off' ? 'on' : 'off');
+  });
+
+  document.querySelectorAll('[data-quality-preset]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.currentTarget.blur();
+      audio.playUiClick();
+      applyQualityPreset(btn.dataset.qualityPreset);
+    });
+  });
+
+  [elBtnDrawerDay, elBtnDrawerNight].forEach((btn) => {
+    btn?.addEventListener('click', (e) => {
+      e.currentTarget.blur();
+      audio.unlock();
+      audio.playUiClick();
+      applyTimeOfDayMode(btn.dataset.timeOfDay || 'day', { broadcast: true });
+    });
+  });
+
+  document.querySelectorAll('[data-studio-char]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.currentTarget.blur();
+      audio.playUiClick();
+      studioTargetChar = btn.dataset.studioChar === 'nadine' ? 'nadine' : 'madjid';
+      document.querySelectorAll('[data-studio-char]').forEach((b) => {
+        const active = b.dataset.studioChar === studioTargetChar;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-pressed', String(active));
+      });
+      renderStudioPreview();
+    });
+  });
+
+  [
+    elStudioSkinName,
+    elStudioBodyColor,
+    elStudioAccentColor,
+    elStudioPattern,
+    elStudioHeadgear,
+    elStudioAura,
+  ].forEach((input) => {
+    input?.addEventListener('input', renderStudioPreview);
+    input?.addEventListener('change', renderStudioPreview);
+  });
+
+  elStudioImageUpload?.addEventListener('change', (e) => {
+    const file = e.target?.files?.[0];
+    if (file) applyStudioFile(file);
+  });
+
+  elBtnStudioSave?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    saveStudioSkin();
+  });
+
+  elBtnTryAgainRespawn?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    autoRespawnTimer = 0;
+    elTryAgainModal?.classList.add('hidden');
+    if (levelState.escapeState && !levelState.escapeState.cleared) {
+      levelState.escapeState.active = false;
+      levelState.escapeState.wallX = levelState.escapeState.wallStartX;
+      levelState.escapeState.timeRemaining = levelState.escapeState.timeLimitSec;
+    }
+    elHudEscapeBanner?.classList.add('hidden');
+    triggerTeamRespawnAtCheckpoint(levelState, simCallbacks);
+    syncHealthHud();
+    syncHudStatic();
+    syncBossBarHud();
+    if (coopSession.active) {
+      broadcastStorySnapshot('checkpoint_rollback', { replace: true });
+      coopClient.sendHpRespawn({ kind: 'respawn' });
+    }
+  });
+
+  elBtnTryAgainRestart?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    audio.playRestart();
+    elTryAgainModal?.classList.add('hidden');
+    if (playMode === 'openworld') {
+      loadOpenWorld({ instantBg: false, showStory: false });
+    } else {
+      loadChapter(currentLevelIdx, { instantBg: false, showStory: false });
+      broadcastStorySnapshot('restart');
+    }
   });
 
   elHudBtnPhoto?.addEventListener('click', (e) => {
     e.currentTarget.blur();
     audio.unlock();
+    toggleSettingsDrawer(false);
     handleSnapPhoto();
+  });
+
+  elHudBtnWeapon?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    handleWeaponUse();
+  });
+
+  elHudBtnWeaponNext?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    audio.unlock();
+    handleWeaponCycle();
   });
 
   elHudBtnScrapbook?.addEventListener('click', (e) => {
@@ -4533,6 +8097,9 @@ function bootstrapBrowserGame() {
   });
 
   canvas.addEventListener('pointerdown', (e) => {
+    if (elSettingsDrawer && !elSettingsDrawer.classList.contains('hidden')) {
+      toggleSettingsDrawer(false);
+    }
     if (gameState !== 'playing' || playMode !== 'openworld' || activeSubModal) return;
     if (e.button !== 0 && e.button !== 2) return;
     audio.unlock();
@@ -4606,6 +8173,19 @@ function bootstrapBrowserGame() {
     coopClient.listRooms(elCoopSearchInput.value.trim());
   });
 
+  elBtnCoopQuickJoin?.addEventListener('click', () => {
+    audio.unlock();
+    audio.playUiClick();
+    if (!coopClient.isConnected()) {
+      pendingQuickJoin = true;
+      setCoopFeedback('Connecting to find an open room...', true);
+      coopClient.connect(elCoopServerUrl.value || getDefaultWsUrl());
+      return;
+    }
+    setCoopFeedback('Searching for first open game session...', true);
+    coopClient.quickJoin({ skinId: selectedSkins[coopCreateCharChoice || 'nadine'] });
+  });
+
   document.getElementById('btn-coop-join-code').addEventListener('click', () => {
     audio.unlock();
     audio.playUiClick();
@@ -4647,25 +8227,57 @@ function bootstrapBrowserGame() {
 
   document.getElementById('btn-coop-leave').addEventListener('click', () => {
     audio.playUiClick();
+    clearLastCoopRoom(window.localStorage);
     coopClient.leaveRoom();
   });
+
+  function applyTouchPadMode(mode) {
+    touchPadMode = mode === 'on' || mode === 'off' ? mode : 'auto';
+    if (touchPadMode === 'on') {
+      elTouchControls.classList.add('force-visible');
+      elTouchControls.classList.remove('force-hidden');
+      elPauseTouchToggle.textContent = 'On-Screen Pad: Always On';
+      if (elDrawerBtnTouchCycle) elDrawerBtnTouchCycle.textContent = 'On-Screen Pad: On';
+    } else if (touchPadMode === 'off') {
+      elTouchControls.classList.remove('force-visible');
+      elTouchControls.classList.add('force-hidden');
+      elPauseTouchToggle.textContent = 'On-Screen Pad: Hidden';
+      if (elDrawerBtnTouchCycle) elDrawerBtnTouchCycle.textContent = 'On-Screen Pad: Hidden';
+    } else {
+      elTouchControls.classList.remove('force-visible', 'force-hidden');
+      elPauseTouchToggle.textContent = 'On-Screen Pad: Auto';
+      if (elDrawerBtnTouchCycle) elDrawerBtnTouchCycle.textContent = 'On-Screen Pad: Auto';
+    }
+    if (elHudBtnTouchToggle) {
+      const isHidden = touchPadMode === 'off';
+      elHudBtnTouchToggle.setAttribute('aria-pressed', String(!isHidden));
+      elHudBtnTouchToggle.setAttribute('title', isHidden ? 'Show On-Screen Controls' : 'Hide On-Screen Controls');
+      const lbl = elHudBtnTouchToggle.querySelector('.hud-btn-label');
+      if (lbl) lbl.textContent = isHidden ? 'Show Pad' : 'Pad';
+    }
+    if (elBtnLobbyTouchToggle) {
+      const isOn = touchPadMode === 'on';
+      elBtnLobbyTouchToggle.textContent =
+        touchPadMode === 'off' ? 'Pad: Hidden' : touchPadMode === 'auto' ? 'Pad: Auto' : 'Pad: On';
+      elBtnLobbyTouchToggle.setAttribute('aria-pressed', String(touchPadMode !== 'off'));
+      elBtnLobbyTouchToggle.classList.toggle('is-active', isOn);
+    }
+    try {
+      window.localStorage.setItem('nadine_touch_pad_mode', touchPadMode);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+  applyTouchPadMode(touchPadMode);
 
   elPauseTouchToggle.addEventListener('click', () => {
     audio.playUiClick();
     if (touchPadMode === 'auto') {
-      touchPadMode = 'on';
-      elTouchControls.classList.add('force-visible');
-      elTouchControls.classList.remove('force-hidden');
-      elPauseTouchToggle.textContent = 'On-Screen Pad: Always On';
+      applyTouchPadMode('on');
     } else if (touchPadMode === 'on') {
-      touchPadMode = 'off';
-      elTouchControls.classList.remove('force-visible');
-      elTouchControls.classList.add('force-hidden');
-      elPauseTouchToggle.textContent = 'On-Screen Pad: Hidden';
+      applyTouchPadMode('off');
     } else {
-      touchPadMode = 'auto';
-      elTouchControls.classList.remove('force-visible', 'force-hidden');
-      elPauseTouchToggle.textContent = 'On-Screen Pad: Auto';
+      applyTouchPadMode('auto');
     }
   });
 
@@ -4699,6 +8311,10 @@ function bootstrapBrowserGame() {
   document.getElementById('btn-victory-title').addEventListener('click', () => {
     audio.playUiClick();
     elVictoryModal.classList.add('hidden');
+    if (coopSession.active) {
+      clearLastCoopRoom(window.localStorage);
+      coopClient.leaveRoom();
+    }
     loadChapter(0, { instantBg: false, showStory: false });
     setGameState('title');
   });
@@ -4715,9 +8331,15 @@ function bootstrapBrowserGame() {
     const rect = canvas.parentElement.getBoundingClientRect();
     viewW = Math.max(320, Math.round(rect.width));
     viewH = Math.max(240, Math.round(rect.height));
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(viewW * dpr);
-    canvas.height = Math.round(viewH * dpr);
+    const nativeDpr = window.devicePixelRatio || 1;
+    dpr =
+      qualityPreset === 'not_bad'
+        ? 0.75
+        : qualityPreset === 'good'
+          ? 1.0
+          : Math.min(nativeDpr, 2.5);
+    canvas.width = Math.max(1, Math.round(viewW * dpr));
+    canvas.height = Math.max(1, Math.round(viewH * dpr));
   }
 
   resizeCanvas();
@@ -4734,6 +8356,7 @@ function bootstrapBrowserGame() {
       const level = LEVELS[currentLevelIdx];
       return {
         gameState,
+        dedicationVisible: gameState === 'dedication' && !elDedicationScreen?.classList.contains('hidden'),
         playMode,
         chapterIndex: currentLevelIdx,
         levelId: playMode === 'openworld' ? 0 : level.id,
@@ -4747,22 +8370,70 @@ function bootstrapBrowserGame() {
         madjid: {
           x: Math.round(levelState.actors.madjid.x),
           y: Math.round(levelState.actors.madjid.y),
+          hp: Math.round(levelState.actors.madjid.hp ?? 100),
+          maxHp: Math.round(levelState.actors.madjid.maxHp ?? 100),
+          dashCooldown: Math.round((levelState.actors.madjid.dashCooldown || 0) * 100) / 100,
           mood: levelState.actors.madjid.mood,
+          onLadder: Boolean(levelState.actors.madjid.onLadder),
           carriedBy: levelState.actors.madjid.carriedBy || null,
           danceStyle: levelState.actors.madjid.danceStyle || null,
           devouredByGhost: Boolean(levelState.actors.madjid.devouredByGhost),
+          weapons: Array.isArray(levelState.actors.madjid.weapons) ? levelState.actors.madjid.weapons.slice() : [],
+          equippedWeapon: levelState.actors.madjid.equippedWeapon || null,
+          phaseDash: Boolean(levelState.actors.madjid.phaseDash?.active),
         },
         nadine: {
           x: Math.round(levelState.actors.nadine.x),
           y: Math.round(levelState.actors.nadine.y),
+          hp: Math.round(levelState.actors.nadine.hp ?? 100),
+          maxHp: Math.round(levelState.actors.nadine.maxHp ?? 100),
+          dashCooldown: Math.round((levelState.actors.nadine.dashCooldown || 0) * 100) / 100,
           mood: levelState.actors.nadine.mood,
+          onLadder: Boolean(levelState.actors.nadine.onLadder),
           carriedBy: levelState.actors.nadine.carriedBy || null,
           danceStyle: levelState.actors.nadine.danceStyle || null,
           devouredByGhost: Boolean(levelState.actors.nadine.devouredByGhost),
+          weapons: Array.isArray(levelState.actors.nadine.weapons) ? levelState.actors.nadine.weapons.slice() : [],
+          equippedWeapon: levelState.actors.nadine.equippedWeapon || null,
+          phaseDash: Boolean(levelState.actors.nadine.phaseDash?.active),
         },
+        gameOver: Boolean(levelState.gameOver),
+        bossDefeated: Boolean(levelState.bossDefeated),
+        portalUnlocked: Boolean(levelState.portalUnlocked),
+        sectorCode: lastSectorCode || null,
+        weddingActive: Boolean(weddingCeremony?.active),
+        hudCollapsed: Boolean(hudCollapsed),
+        touchHubExpanded: Boolean(touchHubExpanded),
+        touchPadMode,
+        qualityPreset,
+        timeOfDayMode,
+        dpr,
+        ladderCount: (levelState.ladders || []).length,
+        escapeActive: Boolean(levelState.escapeState?.active),
+        escapeCleared: Boolean(levelState.escapeState?.cleared),
+        escapeTimeRemaining: levelState.escapeState ? Math.round(levelState.escapeState.timeRemaining * 10) / 10 : null,
+        puzzleCount: (levelState.puzzles || []).length,
+        solvedPuzzlesCount: (levelState.puzzles || []).filter((p) => p.solved).length,
+        secondaryMonsterCount: (levelState.monsters || []).length,
+        arrowTrapCount: (levelState.arrowTraps || []).length,
+        dynamicTrapCount: (levelState.dynamicTraps || []).length,
+        carryBlockCount: (levelState.carryBlocks || []).length,
         keysCollected: levelState.keysCollected,
         keysRequired: levelState.keysRequired,
         activeCheckpoint: levelState.activeCheckpoint ? levelState.activeCheckpoint.id : null,
+        hasCheckpointSnapshot: Boolean(levelState.checkpointSnapshot),
+        savedResume: (() => {
+          const d = getSavedResumeDescriptor();
+          return {
+            primary: d.primary,
+            solo: d.solo
+              ? { worldId: d.solo.worldId, levelIndex: d.solo.levelIndex, checkpointLabel: d.solo.checkpointLabel }
+              : null,
+            coop: d.coop
+              ? { code: d.coop.code, name: d.coop.name, worldId: d.coop.worldId }
+              : null,
+          };
+        })(),
         kissCount: levelState.kissCount,
         kissActive: levelState.kissTimer > 0,
         cryCount: levelState.cryCount,
@@ -4791,6 +8462,7 @@ function bootstrapBrowserGame() {
         },
         mechanics: {
           camScale: Math.round(currentCamScale * 1000) / 1000,
+          zoomFactor: Math.round(currentZoomFactor * 1000) / 1000,
           carrying: mechState.carrying ? { ...mechState.carrying } : null,
           soulLinkActive: mechState.soulLink.active,
           rescueCandidate: mechState.soulLink.rescueCandidate ? { ...mechState.soulLink.rescueCandidate } : null,
@@ -4837,6 +8509,31 @@ function bootstrapBrowserGame() {
           },
           beaconsCount: interactionState.beacons.length,
         },
+        progression: {
+          highestUnlockedWorld: progressionState.highestUnlockedWorld,
+          completedWorlds: progressionState.completedWorlds.slice(),
+          selectedLobbyWorld: lobbySelectedWorldId,
+        },
+        cat: levelState.cat
+          ? {
+              name: levelState.cat.name,
+              discovered: Boolean(levelState.cat.discovered),
+              x: Math.round(levelState.cat.x),
+              y: Math.round(levelState.cat.y),
+              mood: levelState.cat.mood,
+              idleAction: levelState.cat.idleAction,
+              helmetActive: Boolean(levelState.cat.helmetActive),
+              alertActive: levelState.cat.alertTimer > 0,
+            }
+          : null,
+        storyBanner: storyState?.banner
+          ? {
+              id: storyState.banner.id,
+              title: storyState.banner.title,
+              line: storyState.banner.line,
+            }
+          : null,
+        audio: audio.getBgmState(),
       };
     },
     setRemoteInput(charId, intent) {
@@ -4899,12 +8596,37 @@ function bootstrapBrowserGame() {
       cameraShakeTrauma = Math.max(0, cameraShakeTrauma - dt * 2.1);
     }
 
-    // Live Title Screen Ambience: Madjid & Nadine breathing gently with periodic tiny hearts
+    // Live Lobby Campfire Overlook: Madjid, Nadine & Mimi beside warm glowing fire
     if (gameState === 'title') {
+      levelState.actors.madjid.x = 122;
+      levelState.actors.nadine.x = 232;
       levelState.actors.madjid.facing = 1;
       levelState.actors.nadine.facing = -1;
       levelState.actors.madjid.grounded = true;
       levelState.actors.nadine.grounded = true;
+      lobbyCat.x = 158;
+      lobbyCat.y = 582;
+      lobbyCat.facing = 1;
+      lobbyCat.idleAction = Math.floor(elapsedTime * 0.35) % 2 === 0 ? 'purr' : 'sit';
+      lobbyCat.blinkTimer -= dt;
+      if (lobbyCat.blinkTimer <= -0.14) lobbyCat.blinkTimer = 2.4;
+
+      lobbyCampEmberTimer -= dt;
+      if (lobbyCampEmberTimer <= 0) {
+        lobbyCampEmberTimer = 0.28;
+        particles.spawn({
+          x: 186 + (Math.random() - 0.5) * 14,
+          y: 584,
+          vx: (Math.random() - 0.5) * 14,
+          vy: -26 - Math.random() * 20,
+          life: 1.05,
+          size: 2.8,
+          color: Math.random() > 0.35 ? '#FDE047' : '#FB923C',
+          shape: 'spark',
+          gravity: -10,
+        });
+      }
+
       titleHeartTimer -= dt;
       if (titleHeartTimer <= 0) {
         titleHeartTimer = 2.6;
@@ -4938,6 +8660,8 @@ function bootstrapBrowserGame() {
         const localIntent = {
           left: keysHeld.has('ArrowLeft') || keysHeld.has('KeyA') || touchHeld.left,
           right: keysHeld.has('ArrowRight') || keysHeld.has('KeyD') || touchHeld.right,
+          up: jumpHeldNow,
+          down: keysHeld.has('ArrowDown') || keysHeld.has('KeyS') || touchHeld.down,
           jumpHeld: jumpHeldNow,
           jumpJustPressed: localJumpJustPressed || (jumpHeldNow && !prevJumpHeld),
           jumpJustReleased: localJumpJustReleased || (!jumpHeldNow && prevJumpHeld),
@@ -4945,6 +8669,14 @@ function bootstrapBrowserGame() {
         prevJumpHeld = jumpHeldNow;
         localJumpJustPressed = false;
         localJumpJustReleased = false;
+
+        if (
+          elSettingsDrawer &&
+          !elSettingsDrawer.classList.contains('hidden') &&
+          (localIntent.left || localIntent.right || localIntent.up || localIntent.down || localIntent.jumpJustPressed)
+        ) {
+          toggleSettingsDrawer(false);
+        }
 
         if (localInputListeners.size > 0) {
           localInputListeners.forEach((cb) => cb(activeCharId, localIntent));
@@ -5077,60 +8809,172 @@ function bootstrapBrowserGame() {
         stepSimulation(levelState, simInputs, dt, simCallbacks);
         syncCarriedActor(mechState, levelState);
 
-        // 3. Cooperative Boss Step (Stage 5 levels & Summoned Open-World Boss)
-        if (bossState && bossState.active && !bossState.defeated) {
-          stepBoss(bossState, levelState, mechState, dt, {
-            onBossShieldBreak(b) {
-              audio.playSwitchPress();
-              spawnWorldToast(b.x + b.w * 0.5, b.y - 14, 'Shield Shattered!', '#7CC4FA');
-              particles.burst(b.x + b.w * 0.5, b.y + b.h * 0.5, 16, {
-                colors: ['#7CC4FA', '#FFFFFF', '#FDE047'],
-                minSpeed: 65,
-                maxSpeed: 175,
-                size: 4.5,
-                shape: 'spark',
-                gravity: 60,
-              });
-            },
-            onBossShieldDeflect(b, actor) {
-              audio.playSwitchRelease();
-              spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 14, 'Team Up to Break Shield!', '#93C5FD');
-            },
-            onBossHit(b) {
-              hitstopTimer = 0.055;
-              cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.45);
-              audio.playBossHit();
-              particles.burst(b.x + b.w * 0.5, b.y, 18, {
-                colors: ['#FDE047', '#FB923C', '#FFFFFF'],
-                minSpeed: 70,
-                maxSpeed: 195,
-                size: 5,
-                shape: 'spark',
-                gravity: 110,
-              });
-              spawnWorldToast(b.x + b.w * 0.5, b.y - 20, `${b.hp}/${b.maxHp} HP`, '#FDE047');
-            },
-            onBossDefeat(b) {
-              hitstopTimer = 0.08;
-              cameraShakeTrauma = Math.min(1, cameraShakeTrauma + 0.7);
-              audio.playBossDefeat();
-              particles.burst(b.x + b.w * 0.5, b.y + b.h * 0.4, 30, {
-                colors: ['#FDE047', '#F472B6', '#7CC4FA', '#FFF8D6'],
-                minSpeed: 80,
-                maxSpeed: 240,
-                size: 5.5,
-                shape: 'heart',
-                gravity: 75,
-                life: 1.35,
-              });
-              spawnWorldToast(b.x + b.w * 0.5, b.y - 24, `${b.name} Defeated!`, '#FDE047');
-              renderOpenWorldToolbar();
-            },
-            onPortalUnlock(exit) {
-              simCallbacks.onPortalUnlock(exit);
+        // Automatic Checkpoint Team Respawn after 0 HP Cry Beat
+        if (levelState.gameOver) {
+          if (autoRespawnTimer <= 0) {
+            autoRespawnTimer = 1.05;
+          } else {
+            autoRespawnTimer -= dt;
+            if (autoRespawnTimer <= 0) {
+              autoRespawnTimer = 0;
+              elTryAgainModal?.classList.add('hidden');
+              if (levelState.escapeState && !levelState.escapeState.cleared) {
+                levelState.escapeState.active = false;
+                levelState.escapeState.wallX = levelState.escapeState.wallStartX;
+                levelState.escapeState.timeRemaining = levelState.escapeState.timeLimitSec;
+              }
+              elHudEscapeBanner?.classList.add('hidden');
+              triggerTeamRespawnAtCheckpoint(levelState, simCallbacks);
+              syncHealthHud();
               syncHudStatic();
-            },
-          });
+              syncBossBarHud();
+              const dest = levelState.actors.madjid;
+              spawnWorldToast(dest.x + 20, dest.y - 20, 'Recovered at Checkpoint!', '#A7F3D0');
+              if (coopSession.active) {
+                broadcastStorySnapshot('checkpoint_rollback', { replace: true });
+                coopClient.sendHpRespawn({ kind: 'respawn' });
+              }
+            }
+          }
+        } else {
+          autoRespawnTimer = 0;
+        }
+
+        // Entertaining Mini-Scenes (non-blocking banter bubbles + celebration sparkles)
+        const miniScenes = levelState.miniScenes || [];
+        for (let msIdx = 0; msIdx < miniScenes.length; msIdx++) {
+          const ms = miniScenes[msIdx];
+          if (ms.triggered) continue;
+          const mX = levelState.actors.madjid.x;
+          const nX = levelState.actors.nadine.x;
+          if (mX >= ms.triggerX || nX >= ms.triggerX) {
+            ms.triggered = true;
+            const leadId = ms.speaker === 'madjid' ? 'madjid' : 'nadine';
+            const partnerId = leadId === 'madjid' ? 'nadine' : 'madjid';
+            setOverheadSpeechBubble(interactionState, leadId, ms.bubbleText, 4.2);
+            if (ms.partnerBubbleText) {
+              setOverheadSpeechBubble(interactionState, partnerId, ms.partnerBubbleText, 4.2);
+            }
+            const actor = levelState.actors[leadId];
+            if (actor) {
+              if (ms.toastText) {
+                spawnWorldToast(actor.x + actor.w * 0.5, actor.y - 28, ms.toastText, '#FDE68A');
+              }
+              particles.burst(actor.x + actor.w * 0.5, actor.y, 8, {
+                colors: ['#FDE68A', '#F9A8D4', '#93C5FD'],
+                minSpeed: 30,
+                maxSpeed: 88,
+                size: 4.2,
+                shape: ms.danceCue ? 'heart' : 'spark',
+                gravity: -16,
+              });
+            }
+          }
+        }
+
+        // Grand Wedding Ceremony Cutscene Step (after stepping into World 5 Coral Arch)
+        if (weddingCeremony?.active) {
+          weddingCeremony.timer += dt;
+          const archCx = levelState.exit.x + levelState.exit.w * 0.5;
+          const archBottomY = levelState.exit.y + levelState.exit.h - PHYSICS.CHAR_H;
+          const madjid = levelState.actors.madjid;
+          const nadine = levelState.actors.nadine;
+          madjid.x += (archCx - 38 - madjid.x) * Math.min(1, dt * 8);
+          madjid.y += (archBottomY - madjid.y) * Math.min(1, dt * 8);
+          nadine.x += (archCx + 4 - nadine.x) * Math.min(1, dt * 8);
+          nadine.y += (archBottomY - nadine.y) * Math.min(1, dt * 8);
+          madjid.facing = 1;
+          nadine.facing = -1;
+          const leanWave = Math.max(0, Math.sin(weddingCeremony.timer * Math.PI * 1.4));
+          madjid.kissLean = 0.16 * leanWave;
+          nadine.kissLean = -0.16 * leanWave;
+          madjid.mood = 'kissing';
+          nadine.mood = 'kissing';
+          madjid.danceTempo = 4.2;
+          nadine.danceTempo = 4.2;
+          madjid.weddingCeremony = true;
+          nadine.weddingCeremony = true;
+          if (levelState.cat) {
+            levelState.cat.discovered = true;
+            levelState.cat.x += (archCx - 11 - levelState.cat.x) * Math.min(1, dt * 8);
+            levelState.cat.y += (archBottomY + (PHYSICS.CHAR_H - 18) - levelState.cat.y) * Math.min(1, dt * 8);
+            levelState.cat.facing = 1;
+            levelState.cat.idleAction = 'purr';
+            levelState.cat.mood = 'purring';
+            levelState.cat.heartTimer = Math.max(levelState.cat.heartTimer || 0, 1.2);
+          }
+
+          if (weddingCeremony.timer >= weddingCeremony.duration) {
+            weddingCeremony.active = false;
+            madjid.weddingCeremony = false;
+            nadine.weddingCeremony = false;
+            document.getElementById('victory-chapters-val').textContent = `${WORLDS.length}/${WORLDS.length}`;
+            document.getElementById('victory-time-val').textContent = formatTime(totalJourneyTime);
+            document.getElementById('victory-keys-val').textContent = `${LEVELS.length}/${LEVELS.length}`;
+            setGameState('gameover');
+            elVictoryModal.classList.remove('hidden');
+          }
+        }
+
+        // Advance storyline whisper timer & subtle running footstep dust
+        stepStoryline(storyState, dt);
+        syncStoryWhisperHud();
+
+        // Expressive world-aware actor poses & micro-particles (Madjid guard stance, Nadine calm grace, Space jets & Ocean bubbles)
+        {
+          const m = levelState.actors.madjid;
+          const n = levelState.actors.nadine;
+          const bossUp = isBossEngaged(levelState, bossState);
+          const monsterNearM = (levelState.monsters || []).some(
+            (mon) => !mon.defeated && Math.hypot(mon.x + mon.w * 0.5 - (m.x + m.w * 0.5), mon.y + mon.h * 0.5 - (m.y + m.h * 0.5)) <= 180
+          );
+          m.protectiveStance = Boolean(bossUp || monsterNearM || (n.hp ?? 100) < 45);
+          const nearRiddle = (levelState.puzzles || []).some(
+            (pz) => !pz.solved && Math.hypot(pz.tabletX - (n.x + n.w * 0.5), pz.tabletY - (n.y + n.h * 0.5)) <= 160
+          );
+          n.gracefulPose = Boolean(activePhotoSpot || levelState.kissTimer > 0 || nearRiddle);
+
+          if ((levelState.physicsMode === 'space_swim' || levelState.physicsMode === 'underwater') && elapsedTime - lastMicroParticleAt >= 0.18) {
+            lastMicroParticleAt = elapsedTime;
+            [m, n].forEach((act) => {
+              if (Math.hypot(act.vx, act.vy) > 45) {
+                particles.spawn({
+                  x: act.x + act.w * 0.5 - act.facing * 10,
+                  y: act.y + act.h * 0.72,
+                  vx: -act.facing * 24,
+                  vy: levelState.physicsMode === 'underwater' ? -38 : 12,
+                  life: 0.45,
+                  size: levelState.physicsMode === 'underwater' ? 3.2 : 2.8,
+                  color: levelState.physicsMode === 'underwater' ? '#BAE6FD' : '#93C5FD',
+                  shape: 'circle',
+                  gravity: levelState.physicsMode === 'underwater' ? -55 : 10,
+                });
+              }
+            });
+          } else if (levelState.physicsMode === 'normal' && elapsedTime - lastRunDustAt >= 0.22) {
+            lastRunDustAt = elapsedTime;
+            const dustColor = bgSystem.getPlatformStyle().top || '#E2E8F0';
+            [m, n].forEach((act) => {
+              if (act.grounded && Math.abs(act.vx) > 195) {
+                particles.spawn({
+                  x: act.x + act.w * 0.5 - Math.sign(act.vx) * 8,
+                  y: act.y + act.h - 2,
+                  vx: -Math.sign(act.vx) * 26,
+                  vy: -18 - Math.random() * 14,
+                  life: 0.28,
+                  size: 2.3,
+                  color: dustColor,
+                  shape: 'circle',
+                  gravity: 95,
+                });
+              }
+            });
+          }
+        }
+
+        // 3. Cooperative Boss Step (Stage 5s / World Bosses & Summoned Open-World Boss)
+        if (bossState && bossState.active && !bossState.defeated) {
+          stepBoss(bossState, levelState, mechState, dt, bossCallbacks);
           syncBossBarHud();
           if (coopSession.active) {
             const sig = `${bossState.hp}:${bossState.shielded}:${bossState.defeated}:${Math.round(bossState.stunTimer * 2)}`;
@@ -5242,6 +9086,31 @@ function bootstrapBrowserGame() {
             rActor.invulnTimer = remoteActorTarget.invulnTimer;
             rActor.inPortal = remoteActorTarget.inPortal;
             rActor.walkDist = remoteActorTarget.walkDist;
+            rActor.weapons = remoteActorTarget.weapons.slice();
+            rActor.equippedWeapon = remoteActorTarget.equippedWeapon;
+            if (remoteActorTarget.phaseDashActive && !rActor.phaseDash?.active) {
+              rActor.phaseDash = {
+                active: true,
+                trail: [{ x: rActor.x + rActor.w * 0.5, y: rActor.y + rActor.h * 0.5 }],
+              };
+            } else if (!remoteActorTarget.phaseDashActive && rActor.phaseDash?.active) {
+              rActor.phaseDash = null;
+              rActor.phaseRippleTimer = Math.max(rActor.phaseRippleTimer || 0, 0.5);
+            }
+            if (remoteActorTarget.phaseRippleTimer > 0) {
+              rActor.phaseRippleTimer = Math.max(rActor.phaseRippleTimer || 0, remoteActorTarget.phaseRippleTimer);
+            }
+            if (remoteActorTarget.weaponSwing) {
+              rActor.weaponAttack = {
+                active: true,
+                weaponId: remoteActorTarget.weaponSwing.weaponId,
+                timer: remoteActorTarget.weaponSwing.timer,
+                duration: remoteActorTarget.weaponSwing.duration,
+                cooldown: 0,
+                facing: remoteActorTarget.weaponSwing.facing,
+                hitIds: [],
+              };
+            }
             if (remoteActorTarget.blushTimer > 0) {
               interactionState.reactions[rActor.id].blushTimer = Math.max(
                 interactionState.reactions[rActor.id].blushTimer,
@@ -5318,6 +9187,8 @@ function bootstrapBrowserGame() {
               y: Math.round(localActor.y * 10) / 10,
               vx: Math.round(localActor.vx),
               vy: Math.round(localActor.vy),
+              hp: Math.round(localActor.hp ?? 100),
+              maxHp: Math.round(localActor.maxHp ?? 100),
               facing: localActor.facing,
               grounded: localActor.grounded,
               scaleX: Math.round(localActor.scaleX * 100) / 100,
@@ -5329,7 +9200,66 @@ function bootstrapBrowserGame() {
               inPortal: localActor.inPortal,
               walkDist: Math.round(localActor.walkDist),
               blushTimer: Math.round((localActor.blushTimer || 0) * 100) / 100,
+              weapons: Array.isArray(localActor.weapons) ? localActor.weapons.slice(0, 6) : [],
+              equippedWeapon: localActor.equippedWeapon || null,
+              phaseDashActive: Boolean(localActor.phaseDash?.active),
+              phaseRippleTimer: Math.round((localActor.phaseRippleTimer || 0) * 100) / 100,
+              weaponSwing: localActor.weaponAttack?.active
+                ? {
+                    weaponId: localActor.weaponAttack.weaponId,
+                    timer: Math.round(localActor.weaponAttack.timer * 100) / 100,
+                    duration: localActor.weaponAttack.duration,
+                    facing: localActor.weaponAttack.facing,
+                  }
+                : null,
             });
+          }
+        }
+
+        syncHealthHud();
+        updateDashCooldownHud();
+        updateTutorialHint();
+
+        // Update Escape Surge HUD Banner & dynamic ladder/swim touch button label
+        if (elHudEscapeBanner) {
+          const esc = levelState.escapeState;
+          if (esc && esc.active) {
+            elHudEscapeBanner.classList.remove('hidden');
+            if (elHudEscapeTitle) elHudEscapeTitle.textContent = esc.title || 'Escape Surge!';
+            if (elHudEscapeTimer) elHudEscapeTimer.textContent = `${esc.timeRemaining.toFixed(1)}s`;
+          } else {
+            elHudEscapeBanner.classList.add('hidden');
+          }
+        }
+        const activeActor = levelState.actors[coopSession.active && coopSession.localCharId ? coopSession.localCharId : activeCharId];
+        const swimNow = levelState.physicsMode === 'underwater' || levelState.physicsMode === 'space_swim';
+        const ladderNow = Boolean(activeActor && (activeActor.onLadder || findOverlappingLadder(levelState, activeActor)));
+        elTouchDown?.classList.toggle('hidden', !(swimNow || ladderNow));
+        if (elTouchDown) {
+          const dSpan = elTouchDown.querySelector('span');
+          if (dSpan) dSpan.textContent = ladderNow && !swimNow ? 'Climb' : 'Dive';
+        }
+        if (elTouchJump) {
+          const jSpan = elTouchJump.querySelector('span');
+          if (jSpan) {
+            jSpan.textContent =
+              levelState.physicsMode === 'space_swim'
+                ? 'Float'
+                : levelState.physicsMode === 'underwater'
+                  ? 'Swim'
+                  : ladderNow
+                    ? 'Climb'
+                    : 'Jump';
+          }
+        }
+
+        if (playMode === 'story') {
+          const activeSec = getActiveSector(levelState);
+          if (activeSec && activeSec.code !== lastSectorCode) {
+            lastSectorCode = activeSec.code;
+            const curLvl = LEVELS[currentLevelIdx];
+            elHudChapterNum.textContent = `W${curLvl.worldId} · ${activeSec.code}`;
+            elHudChapterTitle.textContent = activeSec.name;
           }
         }
 
@@ -5351,12 +9281,18 @@ function bootstrapBrowserGame() {
       nadine: levelState.actors.nadine,
       activeCharId,
       ghostState: mechState.ghost,
+      isWedding: Boolean(weddingCeremony?.active),
+      isBoss: isBossEngaged(levelState, bossState),
+      isCozyTogether: Boolean(levelState.kissTimer > 0 || mechState.idleSpecial?.active),
     });
     if (!hasInitializedCam) {
       currentCamScale = targetFraming.scale;
+      currentZoomFactor = targetFraming.zoomFactor;
       hasInitializedCam = true;
     } else {
-      currentCamScale += (targetFraming.scale - currentCamScale) * Math.min(1, dt * 4.2);
+      const camBlend = Math.min(1, dt * 4.2);
+      currentCamScale += (targetFraming.scale - currentCamScale) * camBlend;
+      currentZoomFactor += (targetFraming.zoomFactor - currentZoomFactor) * camBlend;
     }
 
     const activeScale = currentCamScale;
@@ -5374,13 +9310,17 @@ function bootstrapBrowserGame() {
     } else {
       const focusActor = levelState.actors[activeCharId];
       const desiredLookAhead =
-        (focusActor.facing || 1) * 44 +
-        (Math.abs(focusActor.vx) > 20 ? Math.sign(focusActor.vx) * 18 : 0);
+        (focusActor.facing || 1) * 72 +
+        (Math.abs(focusActor.vx) > 20 ? Math.sign(focusActor.vx) * 24 : 0);
       cameraLookAheadX += (desiredLookAhead - cameraLookAheadX) * Math.min(1, dt * 3.4);
 
-      const desiredX = targetFraming.focusX + cameraLookAheadX * 0.35 - visibleW * 0.5;
+      const desiredX = targetFraming.focusX + cameraLookAheadX * 0.45 - visibleW * 0.5;
+      const actorCenterX = focusActor.x + focusActor.w * 0.5;
+      const minFocusCamX = actorCenterX - Math.max(80, visibleW - 72);
+      const maxFocusCamX = actorCenterX - 72;
+      const framedX = Math.max(minFocusCamX, Math.min(maxFocusCamX, desiredX));
       const desiredY = targetFraming.focusY - visibleH * 0.54;
-      targetCamX = Math.max(0, Math.min(maxCamX, desiredX));
+      targetCamX = Math.max(0, Math.min(maxCamX, framedX));
       targetCamY = Math.max(0, Math.min(maxCamY, desiredY));
     }
 
@@ -5446,11 +9386,17 @@ function bootstrapBrowserGame() {
       {
         mechState,
         bossState,
+        weddingCeremony,
         photoSpots,
         activePhotoSpot,
+        lobbyCat,
         viewRange: {
           minX: cameraX - 160,
           maxX: cameraX + visibleW + 160,
+        },
+        viewportBounds: {
+          minX: Math.max(0, -offsetX / activeScale),
+          maxX: Math.min(levelState.worldWidth, (viewW - offsetX) / activeScale),
         },
       }
     );
@@ -5477,9 +9423,85 @@ function bootstrapBrowserGame() {
   }
 
   // Boot Initialization
+  audio.setBgmOnStateChange(() => syncMuteUI());
   syncMuteUI();
   updateScrapbookBadge();
+  applyQualityPreset(qualityPreset);
+  applyTimeOfDayMode(timeOfDayMode, { instant: true });
   loadChapter(0, { instantBg: true, showStory: false });
+  renderLobbyWorldMap();
+  renderLobbyResumePrompt();
+  syncLobbyModeButtons();
+  syncHealthHud();
+  updateDashCooldownHud();
+
+  // PWA Service Worker, Install Prompt & Offline Status Indicator
+  if (typeof window !== 'undefined') {
+    const isStandalone =
+      window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true;
+    const isIos = /iphone|ipad|ipod/i.test(window.navigator?.userAgent || '');
+
+    const refreshInstallButtons = () => {
+      const canShow = !isStandalone && (Boolean(deferredInstallPrompt) || isIos);
+      elBtnPwaInstall?.classList.toggle('hidden', !canShow);
+      elBtnTitleInstall?.classList.toggle('hidden', !canShow);
+    };
+
+    const handleInstallClick = async (e) => {
+      e?.currentTarget?.blur?.();
+      audio.unlock();
+      audio.playUiClick();
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        try {
+          await deferredInstallPrompt.userChoice;
+        } catch {
+          // Ignore dismissal
+        }
+        deferredInstallPrompt = null;
+        refreshInstallButtons();
+      } else if (isIos) {
+        elIosInstallModal?.classList.remove('hidden');
+      }
+    };
+
+    elBtnPwaInstall?.addEventListener('click', handleInstallClick);
+    elBtnTitleInstall?.addEventListener('click', handleInstallClick);
+    elBtnIosInstallClose?.addEventListener('click', () => {
+      audio.playUiClick();
+      elIosInstallModal?.classList.add('hidden');
+    });
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      refreshInstallButtons();
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      refreshInstallButtons();
+    });
+
+    const syncOnlineStatus = () => {
+      const online = window.navigator?.onLine !== false;
+      elOfflineIndicator?.classList.toggle('hidden', online);
+    };
+    window.addEventListener('online', syncOnlineStatus);
+    window.addEventListener('offline', syncOnlineStatus);
+    syncOnlineStatus();
+    refreshInstallButtons();
+
+    if ('serviceWorker' in window.navigator) {
+      import('virtual:pwa-register')
+        .then(({ registerSW }) => {
+          registerSW({ immediate: true });
+        })
+        .catch(() => {
+          // Ignore if SW registration is unavailable in non-bundled harness
+        });
+    }
+  }
 
   // Honor ?autostart=1&level=<1..50> (and backward-compatible &chapter=) for instant testing
   const params = new URLSearchParams(window.location.search);
@@ -5488,7 +9510,13 @@ function bootstrapBrowserGame() {
     const startIdx = !Number.isNaN(lvlParam) && lvlParam >= 1 && lvlParam <= LEVELS.length ? lvlParam - 1 : 0;
     startNewGame(startIdx, { silent: true });
   } else {
-    setGameState('title');
+    setGameState('dedication');
+    dedicationAutoTimer = window.setTimeout(() => {
+      dedicationAutoTimer = null;
+      if (gameState === 'dedication') {
+        setGameState('title');
+      }
+    }, 6500);
   }
 
   window.requestAnimationFrame(tick);
