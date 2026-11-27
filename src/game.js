@@ -9491,16 +9491,6 @@ function bootstrapBrowserGame() {
     window.addEventListener('offline', syncOnlineStatus);
     syncOnlineStatus();
     refreshInstallButtons();
-
-    if ('serviceWorker' in window.navigator) {
-      import('virtual:pwa-register')
-        .then(({ registerSW }) => {
-          registerSW({ immediate: true });
-        })
-        .catch(() => {
-          // Ignore if SW registration is unavailable in non-bundled harness
-        });
-    }
   }
 
   // Honor ?autostart=1&level=<1..50> (and backward-compatible &chapter=) for instant testing
